@@ -80,6 +80,7 @@ class SimulatorExecutor:
             with open(os.path.join(DATA, "ground_truth.json")) as fh:
                 truth = json.load(fh)
         self.truth = truth
+        self.seed = seed
         self.rng = np.random.default_rng(seed)
         self._u: dict[str, float] = {}
         self._applied: dict[str, dict[str, int]] = {}
@@ -88,8 +89,20 @@ class SimulatorExecutor:
     # ---------------------------------------------------------------- per-case
 
     def begin_case(self, case_id: str) -> None:
-        """Draw the latent willingness for this case, once."""
-        self._u[case_id] = float(self.rng.random())
+        """Fix the latent willingness for this case, once.
+
+        Derived deterministically from (seed, case_id) rather than drawn from a
+        running generator, so a case gets the SAME latent draw regardless of
+        which arm processes it or in what order. That is what makes the arms
+        comparable case-for-case and the whole run reproducible.
+        """
+        h = self.seed & 0xFFFFFFFF
+        for ch in case_id:
+            h = (h * 1099511628211 + ord(ch)) & 0xFFFFFFFFFFFFFFFF
+        h ^= (h >> 33)
+        h = (h * 0xFF51AFD7ED558CCD) & 0xFFFFFFFFFFFFFFFF
+        h ^= (h >> 33)
+        self._u[case_id] = (h % 10_000_000) / 10_000_000.0
         self._applied[case_id] = {}
 
     def _multiplier(self, case_id: str, action: str) -> float:

@@ -185,6 +185,7 @@ class StateMachine:
         action = plan.action
         elapsed_h = 0.0
         escalation_used = False
+        full_rules_logged = False
 
         while True:
             self._go(out, "POLICY_CHECKED")
@@ -198,15 +199,27 @@ class StateMachine:
             )
             decision = self.engine.evaluate(case, action, ctx)
 
+            # The full eight-rule trace is logged on the first check and on any
+            # check that is not clean. Repeat clean checks store counts only --
+            # the trace is identical, and repeating it inflated the audit
+            # artifact roughly fourfold for no added information.
+            interesting = (not full_rules_logged or decision.outcome != ALLOW
+                           or decision.deferred)
+            payload = {"blocked_by": decision.blocked_by,
+                       "deferred": decision.deferred,
+                       "deferred_to_hour": decision.deferred_to_hour,
+                       "rules_evaluated": decision.rules_evaluated,
+                       "rules_applicable": decision.rules_applicable,
+                       "violations": [r.rule_id for r in decision.violations]}
+            if interesting:
+                payload["rules"] = [r.to_dict() for r in decision.rules]
+                full_rules_logged = True
             self.trail.append(
                 cid, ev.POLICY_CHECKED, "policy",
                 f"{decision.outcome} for {action}; "
                 f"{decision.rules_evaluated} rules evaluated, "
                 f"{len(decision.violations)} violations", "POLICY_CHECKED",
-                {"rules": [r.to_dict() for r in decision.rules],
-                 "blocked_by": decision.blocked_by,
-                 "deferred": decision.deferred,
-                 "deferred_to_hour": decision.deferred_to_hour})
+                payload)
 
             if decision.outcome == BLOCK:
                 self._go(out, "BLOCKED")

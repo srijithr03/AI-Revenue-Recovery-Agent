@@ -45,8 +45,8 @@ ACTIONS_ALL = tuple(ACTIONS)
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
-N_CASES = 5000
-N_HOLDOUT = 1000
+N_CASES = 16000
+N_HOLDOUT = 12000
 
 # IST -- the merchant local clock.  Quiet hours and "late night" are defined in
 # this frame, so the generator and the policy engine must agree on it.
@@ -503,7 +503,7 @@ def generate(n: int = N_CASES, seed: int | None = None
 # evaluation case appears in it.
 
 HISTORY_SEED_OFFSET = 7717
-N_HISTORY = 15000
+N_HISTORY = 25000
 
 
 def generate_history(n: int = N_HISTORY, seed: int | None = None
