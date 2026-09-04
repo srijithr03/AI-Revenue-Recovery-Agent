@@ -62,6 +62,36 @@ def normalise_reason(reason: str) -> str:
     return r.split(";")[0].strip()
 
 
+def run_test_suite() -> dict[str, Any]:
+    """Actually run the tests and record the result.
+
+    The interface reports a passing-test count. Hardcoding that number would
+    make it a claim rather than a measurement, and it would go stale the first
+    time someone added a test. Running the suite here means the figure on the
+    evaluation screen is always what pytest just said.
+    """
+    import subprocess
+    out: dict[str, Any] = {"ran": False, "passed": 0, "failed": 0, "by_file": {}}
+    files = ["test_policy.py", "test_state_machine.py", "test_allocation.py",
+             "test_ground_truth_boundary.py"]
+    try:
+        for f in files:
+            proc = subprocess.run(
+                [sys.executable, "-m", "pytest", os.path.join(ROOT, "tests", f), "-q"],
+                capture_output=True, text=True, cwd=ROOT, timeout=600)
+            m = re.search(r"(\d+) passed", proc.stdout)
+            fm = re.search(r"(\d+) failed", proc.stdout)
+            n = int(m.group(1)) if m else 0
+            nf = int(fm.group(1)) if fm else 0
+            out["by_file"][f] = {"passed": n, "failed": nf}
+            out["passed"] += n
+            out["failed"] += nf
+        out["ran"] = True
+    except Exception as exc:  # noqa: BLE001 - never let this break the eval
+        out["error"] = f"{type(exc).__name__}: {exc}"
+    return out
+
+
 def rule(title: str = "") -> None:
     print("\n" + "=" * 78)
     if title:
@@ -375,6 +405,18 @@ def main() -> int:
     print(f"      by case     {skipped_cases_recovered / max(len(skipped), 1):>6.1%} of skipped "
           f"cases, against {pres['control'].recovery_rate:.1%} across the control arm")
 
+    # ---- tests -----------------------------------------------------------
+    rule("TESTS")
+    tests = run_test_suite()
+    if tests["ran"]:
+        for f, r in tests["by_file"].items():
+            print(f"  {f:32} {r['passed']:>4} passed"
+                  + (f", {r['failed']} FAILED" if r["failed"] else ""))
+        print(f"  {'total':32} {tests['passed']:>4} passed"
+              + (f", {tests['failed']} FAILED" if tests["failed"] else ""))
+    else:
+        print(f"  could not run the suite: {tests.get('error')}")
+
     # ---- artifacts -------------------------------------------------------
     rule("ARTIFACTS")
     rz = RazorpayTestExecutor()
@@ -521,6 +563,7 @@ def main() -> int:
             "control_case_rate": round(pres["control"].recovery_rate, 4),
         },
         "stop_reasons": dict(stops.most_common()),
+        "tests": tests,
     }
 
     # summary.json is pretty-printed because people read it. The bulk artifacts

@@ -459,8 +459,22 @@ export default function Evaluation({ summary }) {
                 <tr><td>cases with every action refused</td><td className="mono">{count(summary.policy.cases_fully_blocked)}</td></tr>
                 <tr><td>quiet-hour deferrals</td><td className="mono">{count(summary.policy.deferrals)}</td></tr>
                 <tr><td>unpermitted actions executed</td><td className="mono">0</td></tr>
-                <tr><td>policy tests passing</td><td className="mono">72 / 72</td></tr>
-                <tr><td>total tests passing</td><td className="mono">137 / 137</td></tr>
+                <tr>
+                  <td>policy tests passing</td>
+                  <td className="mono">
+                    {summary.tests?.by_file?.['test_policy.py']
+                      ? `${summary.tests.by_file['test_policy.py'].passed} passed`
+                      : '—'}
+                  </td>
+                </tr>
+                <tr>
+                  <td>all tests passing</td>
+                  <td className="mono">
+                    {summary.tests?.ran
+                      ? `${count(summary.tests.passed)} passed${summary.tests.failed ? `, ${summary.tests.failed} FAILED` : ''}`
+                      : '—'}
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -560,7 +574,9 @@ export default function Evaluation({ summary }) {
         <div className="callout">
           <p>
             <span className="mono">python run.py all</span> regenerates the world, verifies its
-            property gates, runs {`137`} tests, and reproduces every number on this page from seed{' '}
+            property gates, runs{' '}
+            {summary.tests?.ran ? count(summary.tests.passed) : 'the'} tests, and reproduces
+            every number on this page from seed{' '}
             <span className="mono">{summary.run.seed}</span>. This run took{' '}
             <span className="mono">{duration(summary.run.duration_seconds)}</span> on Python{' '}
             <span className="mono">{summary.run.python}</span>.

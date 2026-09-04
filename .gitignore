@@ -6,3 +6,4 @@ node_modules/
 ui/dist/
 .pytest_cache/
 .DS_Store
+data/llm_cache.json

@@ -1,14 +1,14 @@
 {
  "run": {
   "seed": 8675309,
-  "generated_at": "2026-09-04 20:25:47 IST",
-  "duration_seconds": 145.89,
+  "generated_at": "2026-09-04 20:39:32 IST",
+  "duration_seconds": 170.66,
   "python": "3.11.9",
   "n_world": 16000,
   "n_holdout": 12000,
   "n_train": 4000,
   "n_history": 25000,
-  "throughput_cases_per_second": 236290.7,
+  "throughput_cases_per_second": 179792.5,
   "ui_slice": 1500
  },
  "execution": {
@@ -101,7 +101,7 @@
     "gap": -0.0048
    }
   ],
-  "duration_seconds": 0.051
+  "duration_seconds": 0.067
  },
  "uplift": {
   "reliability": [
@@ -1978,5 +1978,28 @@
   "case aged out of the observation window": 121,
   "success landed Nh after failure, outside the Nh window": 30,
   "payment succeeded then was reversed": 30
+ },
+ "tests": {
+  "ran": true,
+  "passed": 137,
+  "failed": 0,
+  "by_file": {
+   "test_policy.py": {
+    "passed": 72,
+    "failed": 0
+   },
+   "test_state_machine.py": {
+    "passed": 34,
+    "failed": 0
+   },
+   "test_allocation.py": {
+    "passed": 22,
+    "failed": 0
+   },
+   "test_ground_truth_boundary.py": {
+    "passed": 9,
+    "failed": 0
+   }
+  }
  }
 }
