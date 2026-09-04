@@ -1,0 +1,67 @@
+# L4 -- Policy configuration.
+#
+# Policy lives in YAML, not in code, on purpose: it is human-readable, it
+# diffs cleanly in review, and it is obviously not something the agent can
+# rewrite at runtime. Changing merchant policy is a config change, not a
+# deploy.
+#
+# Every value here is enforced by agent/policy.py and covered by tests in
+# tests/test_policy.py.
+
+limits:
+  # R4 -- how many payment attempts one case may consume, in total.
+  max_retry_attempts: 3
+
+  # Minimum gap between two attempts on the same case.
+  min_retry_interval_minutes: 30
+
+  # R5 -- how many times one customer may be contacted about one failed
+  # payment. Two is a nudge; three is harassment.
+  max_contacts_per_case: 2
+
+  # A14 -- the finite contact budget for a whole batch. Deliberately binding:
+  # the naive arm wants roughly 5x this. See data/ASSUMPTIONS.md.
+  contact_budget_per_batch: 150
+
+  # R7 -- beyond this age, "recovered" stops meaning "we recovered it" and
+  # starts meaning "the customer bought again". Matches the A13 observation
+  # window.
+  max_case_age_hours: 72
+
+# R6 -- quiet hours, in IST. A contact that lands inside this window is
+# DEFERRED to the next permitted moment, never cancelled. Cancelling would
+# discard recoverable revenue for no compliance benefit, and with a 12-hour
+# window it silently kills roughly a third of the contact plan.
+quiet_hours:
+  start_hour: 21   # 21:00 IST, inclusive
+  end_hour: 9      # 09:00 IST, exclusive
+  timezone: "Asia/Kolkata"
+
+thresholds:
+  # Cases at or above this value never execute automatically. They route to a
+  # human. This is ESCALATE -- a routing decision, not a block.
+  high_value_inr: 25000.0
+
+  # R2 -- at or above this risk score, no action is permitted at all.
+  risk_block: 0.7
+
+# Two EV floors, not one. This distinction is load-bearing.
+#
+# A retry costs about Rs 2. A customer contact carries about Rs 40 of annoyance
+# cost on top of send cost. Applying one floor to both suppresses hundreds of
+# profitable retries -- a retry worth Rs 12 of incremental EV is clearly worth
+# taking and would be rejected by a Rs 50 floor.
+ev_floors:
+  contact_actions_inr: 50.0      # a contact must clearly earn its annoyance cost
+  zero_contact_actions_inr: 0.5  # any positive-EV retry is worth taking
+
+# R8 -- the closed enumeration of permitted actions. An LLM proposing anything
+# outside this list is rejected here, not somewhere downstream.
+permitted_actions:
+  - no_action
+  - retry_immediate
+  - retry_delayed
+  - sms_payment_link
+  - whatsapp_nudge
+  - method_update_request
+  - human_escalation

@@ -36,7 +36,11 @@ from typing import Any
 
 import numpy as np
 
-from agent.constants import CONTACT_ACTIONS, METHODS, TREATMENT_ACTIONS
+from agent.constants import (ACTIONS, CONTACT_ACTIONS, FAILURE_CLASSES,
+                             METHODS, TREATMENT_ACTIONS)
+
+FAILURE_CLASSES_ALL = tuple(FAILURE_CLASSES)
+ACTIONS_ALL = tuple(ACTIONS)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -169,44 +173,61 @@ GATEWAY_CODES = {
 UNMAPPED_CODE = "UNMAPPED"
 
 # A7 -- free-text gateway messages for the ~15% ambiguous slice.  Written in the
-# register real gateways actually use: vague, passive, and unhelpful.  Each
-# still has a known true class, so diagnosis accuracy stays measurable.
-AMBIGUOUS_MESSAGES = {
-    "temporary_failure": [
-        "The transaction could not be completed at this time. Please try again later.",
-        "Unable to process request. The service is temporarily unable to respond.",
-        "Payment not completed due to a connectivity issue at the bank end.",
-        "Request failed. No response was received from the remote host.",
-        "The operation did not complete. Please reattempt after some time.",
-    ],
-    "insufficient_funds": [
-        "The issuing bank declined the transaction. Please contact your bank for details.",
-        "Transaction not permitted on this account at this time.",
-        "Your bank was unable to authorise this payment. Please try a different account.",
-        "Payment declined by the account holder bank.",
-    ],
-    "invalid_method": [
-        "The payer VPA is no longer active.",
-        "The saved instrument can no longer be used for this payment.",
-        "Account details on file could not be validated with the bank.",
-        "This payment instrument is not in a usable state.",
-    ],
-    "authentication_failure": [
-        "The customer did not complete the required verification step.",
-        "Authorisation was not confirmed within the permitted time.",
-        "Verification was not completed for this payment.",
-        "The additional security check was not finished by the payer.",
-    ],
-    "risk_blocked": [
-        "This transaction did not pass our internal checks.",
-        "Payment could not be processed for this account.",
-        "The request was stopped before reaching the bank.",
-    ],
-    "repeated_failure": [
-        "Multiple recent attempts on this instrument have not succeeded.",
-        "This payment has been declined on prior attempts as well.",
-    ],
-}
+# register real gateways actually use: vague, passive, and unhelpful.
+#
+# Each entry declares the SET of true causes that can produce it.  Messages
+# whose set has more than one member are genuinely ambiguous from the text
+# alone -- "the issuing bank declined the transaction" is what a gateway says
+# for an empty balance, a risk hold, AND a dead card.
+#
+# This is the property that makes the LLM path do real work.  A regex sees only
+# the string and must guess the modal class; a model that is also given the
+# customer history (prior failures, tenure, risk score) can resolve which cause
+# is actually in play.  The final entry is resolvable by nothing, and exists so
+# that abstaining with `unknown` is sometimes the only correct answer.
+AMBIGUOUS_MESSAGE_POOL: list[tuple[str, tuple[str, ...]]] = [
+    # -- genuinely ambiguous: the same sentence, several different causes -----
+    ("The issuing bank declined the transaction. Please contact your bank for details.",
+     ("insufficient_funds", "risk_blocked", "invalid_method", "repeated_failure")),
+    ("Transaction not permitted on this account at this time.",
+     ("insufficient_funds", "risk_blocked", "invalid_method")),
+    ("The transaction could not be completed at this time. Please try again later.",
+     ("temporary_failure", "authentication_failure")),
+    ("Payment could not be processed. Please try a different payment method.",
+     ("invalid_method", "insufficient_funds", "repeated_failure")),
+    ("The request was not completed.",
+     ("temporary_failure", "authentication_failure", "risk_blocked")),
+    ("We were unable to process this payment at this time.",
+     ("temporary_failure", "insufficient_funds", "risk_blocked")),
+    ("Your bank was unable to authorise this payment.",
+     ("insufficient_funds", "authentication_failure", "risk_blocked")),
+    ("The operation did not complete. Please reattempt after some time.",
+     ("temporary_failure", "authentication_failure", "repeated_failure")),
+
+    # -- resolvable from the text alone ---------------------------------------
+    ("Unable to process request. The service is temporarily unable to respond.",
+     ("temporary_failure",)),
+    ("Request failed. No response was received from the remote host.",
+     ("temporary_failure",)),
+    ("The customer did not complete the required verification step.",
+     ("authentication_failure",)),
+    ("Authorisation was not confirmed within the permitted time.",
+     ("authentication_failure",)),
+    ("The payer VPA is no longer active.",
+     ("invalid_method",)),
+    ("The saved instrument can no longer be used for this payment.",
+     ("invalid_method",)),
+    ("Your account has insufficient balance to complete this transaction.",
+     ("insufficient_funds",)),
+    ("This transaction did not pass our internal checks.",
+     ("risk_blocked",)),
+    ("Multiple recent attempts on this instrument have not succeeded.",
+     ("repeated_failure",)),
+
+    # -- resolvable by nothing: the correct answer here is to abstain ---------
+    ("This payment did not go through. No further details are available.",
+     FAILURE_CLASSES_ALL),
+]
 
 # A8 -- merchant categories, descriptive colour on the case record.
 MERCHANT_CATEGORIES = ["subscription", "ecommerce", "edtech", "travel", "utilities", "gaming"]
@@ -244,14 +265,23 @@ def _draw_failure_class(rng: np.random.Generator, prior_failures: int,
     """
     weights = dict(FAILURE_CLASS_PRIOR)
 
-    # Customers who have already failed repeatedly are far more likely to be
-    # failing for the same structural reason again.
-    if prior_failures >= 3:
-        weights["repeated_failure"] *= 4.0
+    # `repeated_failure` is close to definitional: it MEANS the nth consecutive
+    # failure on the same instrument.  So it is largely determined by the prior
+    # failure count rather than drawn freely.  The residual mass at high counts
+    # is the genuine case where something new went wrong on an account that also
+    # happens to have a bad history -- a real transient outage on a chronic
+    # failer.  That residual is what stops the L1 contradiction rule from being
+    # a free win.
+    if prior_failures >= 4:
+        weights["repeated_failure"] *= 21.0
         weights["invalid_method"] *= 1.6
         weights["temporary_failure"] *= 0.6
+    elif prior_failures == 3:
+        weights["repeated_failure"] *= 6.0
+        weights["invalid_method"] *= 1.6
+        weights["temporary_failure"] *= 0.7
     elif prior_failures == 2:
-        weights["repeated_failure"] *= 2.0
+        weights["repeated_failure"] *= 2.5
 
     # Brand-new customers skew toward setup problems, not transient ones.
     if tenure_days < 30:
@@ -385,11 +415,26 @@ def generate(n: int = N_CASES, seed: int | None = None
         # ---- gateway signal ---------------------------------------------------
         # Requirement 4: ~15% carry unmapped free text only.
         ambiguous = bool(rng.random() < 0.15)
+        misleading_code = False
         if ambiguous:
             gateway_code = UNMAPPED_CODE
-            gateway_message = str(rng.choice(AMBIGUOUS_MESSAGES[failure_class]))
+            options = [m for m, cls in AMBIGUOUS_MESSAGE_POOL if failure_class in cls]
+            gateway_message = options[int(rng.integers(len(options)))]
         else:
-            gateway_code = str(rng.choice(GATEWAY_CODES[failure_class]))
+            # A15 -- a gateway reports the PROXIMATE symptom, not the actionable
+            # cause.  A card that has failed five times running still returns
+            # INSUFFICIENT_FUNDS on the sixth attempt; the code is accurate and
+            # the diagnosis it implies is wrong.  Retrying is pointless, and a
+            # method update is the move.  Modelling this is what gives the
+            # contradictory-signal rule (L1) something real to catch.
+            if failure_class == "repeated_failure" and rng.random() < 0.65:
+                symptom = str(rng.choice(
+                    ["insufficient_funds", "invalid_method", "authentication_failure"],
+                    p=[0.50, 0.30, 0.20]))
+                gateway_code = str(rng.choice(GATEWAY_CODES[symptom]))
+                misleading_code = True
+            else:
+                gateway_code = str(rng.choice(GATEWAY_CODES[failure_class]))
             gateway_message = ""
 
         # ---- compliance flags -------------------------------------------------
@@ -434,9 +479,57 @@ def generate(n: int = N_CASES, seed: int | None = None
             "true_failure_class": failure_class,
             "annoyance_prone": annoyance_prone,
             "ambiguous": ambiguous,
+            "misleading_code": misleading_code,
         }
 
     return cases, truth
+
+
+# ===========================================================================
+# Historical exploration log
+# ===========================================================================
+#
+# What a merchant actually has is not a set of probabilities -- it is a pile of
+# past failed payments, each with an action that was taken and a binary outcome
+# that was observed.  This function produces exactly that, and it is the ONLY
+# thing the agent is fitted on.
+#
+# Actions are assigned at random, which is what makes the log an exploration
+# log rather than a confounded observational one: because assignment is
+# independent of the hidden probabilities, the difference in outcome rates
+# between treated and untreated cells is an unbiased estimate of uplift.
+#
+# The log is drawn from a DIFFERENT seed than the evaluation world, so no
+# evaluation case appears in it.
+
+HISTORY_SEED_OFFSET = 7717
+N_HISTORY = 15000
+
+
+def generate_history(n: int = N_HISTORY, seed: int | None = None
+                     ) -> list[dict[str, Any]]:
+    """Past failed payments with a randomised action and an OBSERVED outcome.
+
+    The returned records carry no probabilities. Only ``action_taken`` and
+    ``recovered`` are added to the observable case fields.
+    """
+    if seed is None:
+        seed = read_seed()
+    cases, truth = generate(n, seed + HISTORY_SEED_OFFSET)
+    rng = np.random.default_rng(seed + HISTORY_SEED_OFFSET + 1)
+
+    log: list[dict[str, Any]] = []
+    for case in cases:
+        t = truth[case["case_id"]]
+        action = str(rng.choice(list(ACTIONS_ALL)))
+        # R2: the outcome is SAMPLED, never assigned deterministically.
+        recovered = bool(rng.random() < t["p_treated"][action])
+        rec = dict(case)
+        rec["case_id"] = "HIST-" + case["case_id"].split("-")[1]
+        rec["action_taken"] = action
+        rec["recovered"] = recovered
+        log.append(rec)
+    return log
 
 
 def split_ids(cases: list[dict[str, Any]], seed: int,
@@ -465,7 +558,15 @@ def main() -> None:
     print(f"seed              {seed}")
     print(f"cases             {len(cases)}")
     print(f"train / holdout   {len(split['train'])} / {len(split['holdout'])}")
-    print("wrote data/cases.json, data/ground_truth.json, data/split.json")
+    history = generate_history(N_HISTORY, seed)
+    with open(os.path.join(HERE, "history.json"), "w") as fh:
+        json.dump(history, fh, indent=1)
+
+    hrec = sum(h["recovered"] for h in history)
+    print(f"history log        {len(history)} records, "
+          f"{hrec / len(history):.1%} observed recovery")
+    print("wrote data/cases.json, data/ground_truth.json, data/split.json, "
+          "data/history.json")
 
 
 if __name__ == "__main__":
