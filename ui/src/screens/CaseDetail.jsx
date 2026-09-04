@@ -229,7 +229,8 @@ export default function CaseDetail({ summary }) {
       </Section>
 
       <Section title="Policy">
-        <PolicyBar audit={audit} state={c.state} stopReason={c.stop_reason} deferrals={c.deferrals} />
+        <PolicyBar audit={audit} state={c.state} stopReason={c.stop_reason}
+                   deferrals={c.deferrals} alternatives={alternatives} />
       </Section>
 
       <Section title="Execution">
@@ -287,7 +288,7 @@ export default function CaseDetail({ summary }) {
   );
 }
 
-function PolicyBar({ audit, state, stopReason, deferrals }) {
+function PolicyBar({ audit, state, stopReason, deferrals, alternatives = [] }) {
   const checks = audit.filter((e) => e.event === 'POLICY_CHECKED');
   const withRules = checks.find((e) => e.payload?.rules);
   const rules = withRules?.payload?.rules || [];
@@ -298,9 +299,25 @@ function PolicyBar({ audit, state, stopReason, deferrals }) {
   const tone = blocked ? 'blocked' : state === 'ESCALATED' ? 'escalated' : '';
 
   if (!checks.length) {
+    // A case can be stopped by policy without ever reaching the execution loop:
+    // allocation consults the engine while scoring alternatives and simply will
+    // not PLAN an action a rule would refuse. Saying "no policy evaluation" here
+    // would be exactly backwards on the cases policy actually stopped.
+    const refused = alternatives.filter((a) => a.rejection_type === 'policy');
+    const rules = [...new Set(refused.map((a) => a.blocked_by).filter(Boolean))].sort();
+    if (refused.length) {
+      return (
+        <div className="policy-bar blocked">
+          {refused.length} of {alternatives.length - 1} candidate actions refused at
+          allocation time by <span className="mono">{rules.join(', ')}</span>. The case
+          never reached execution because there was nothing left it was permitted to do.
+          <div className="policy-line">{stopReason}</div>
+        </div>
+      );
+    }
     return (
       <div className="policy-bar">
-        No policy evaluation — the case was never eligible.
+        No rule refused an action here. The case was not pursued on value grounds.
         <div className="policy-line">{stopReason}</div>
       </div>
     );
