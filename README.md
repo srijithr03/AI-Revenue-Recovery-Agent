@@ -142,7 +142,7 @@ faced a case where staying silent was correct.
 python run.py all
 ```
 
-Regenerates the world, verifies its difficulty gates, runs 137 tests, and
+Regenerates the world, verifies its difficulty gates, runs 140 tests, and
 reproduces **every number in this README and in the interface** from seed
 `8675309`. This run took 145.89s on Python 3.11.9. Artifacts are committed in
 `eval/results/`.
@@ -256,13 +256,24 @@ a perfect match would itself be evidence of leakage.
 | Cases with every action refused | 2,185 |
 | Quiet-hour deferrals | 841 |
 | Unpermitted actions executed | **0** |
-| Tests | 137 passing (72 policy, 34 state machine, 22 allocation, 9 boundary) |
+| Tests | 140 passing (72 policy, 37 state machine, 22 allocation, 9 boundary) |
 | Revenue deliberately not pursued | 3,421 cases, ₹1,24,92,950 at risk |
 | …of which recovered anyway | 4.2% by revenue vs 20.3% control · 4.8% by case vs 22.6% control |
 
 That last row is the judgement claim: the cases the agent walked away from
 really were the ones that were not coming back, at roughly a quarter of the
 control-arm rate on either measure.
+
+The single largest of them is worth opening in the interface. `REC-4482` is a
+₹1,00,833 payment, and the reason it was not pursued is:
+
+> every action refused by policy (R7); forgoes method_update_request at
+> incremental EV 4180.06
+
+The case was 73.85 hours old against a 72-hour limit. The system had a
+positive-expected-value action available, priced it at ₹4,180, and declined to
+take it because a stopping rule said the recovery was no longer attributable.
+That is what "the system can give up" looks like on real money.
 
 ---
 

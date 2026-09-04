@@ -1,14 +1,14 @@
 {
  "run": {
   "seed": 8675309,
-  "generated_at": "2026-09-04 20:39:32 IST",
-  "duration_seconds": 170.66,
+  "generated_at": "2026-09-04 20:45:09 IST",
+  "duration_seconds": 171.94,
   "python": "3.11.9",
   "n_world": 16000,
   "n_holdout": 12000,
   "n_train": 4000,
   "n_history": 25000,
-  "throughput_cases_per_second": 179792.5,
+  "throughput_cases_per_second": 175537.4,
   "ui_slice": 1500
  },
  "execution": {
@@ -101,7 +101,7 @@
     "gap": -0.0048
    }
   ],
-  "duration_seconds": 0.067
+  "duration_seconds": 0.068
  },
  "uplift": {
   "reliability": [
@@ -464,11 +464,13 @@
     "ESCALATED": 161
    },
    "stop_reasons": {
-    "no action cleared its EV floor; best incremental EV 0.00": 2951,
     "maximum attempts reached": 2925,
+    "every action refused by policy": 2185,
     "batch contact budget exhausted": 1365,
     "per-case contact limit reached": 768,
+    "no action cleared its EV floor; best incremental EV 0.00": 681,
     "case aged out of the observation window": 121,
+    "no permitted action cleared its EV floor; best incremental EV 0.00, with 4 action": 85,
     "payment succeeded then was reversed": 30,
     "success landed 72.4h after failure, outside the 72h window; not attributable": 7,
     "success landed 72.0h after failure, outside the 72h window; not attributable": 4,
@@ -1290,10 +1292,12 @@
    },
    "stop_reasons": {
     "maximum attempts reached": 977,
-    "no action cleared its EV floor; best incremental EV 0.00": 974,
+    "every action refused by policy": 713,
     "batch contact budget exhausted": 442,
     "per-case contact limit reached": 248,
+    "no action cleared its EV floor; best incremental EV 0.00": 229,
     "case aged out of the observation window": 48,
+    "no permitted action cleared its EV floor; best incremental EV 0.00, with 4 action": 32,
     "payment succeeded then was reversed": 13,
     "success landed 72.4h after failure, outside the 72h window; not attributable": 3,
     "success landed 72.0h after failure, outside the 72h window; not attributable": 3,
@@ -1969,19 +1973,22 @@
   "control_case_rate": 0.2259
  },
  "stop_reasons": {
-  "no action cleared its EV floor": 2951,
   "maximum attempts reached (N)": 2925,
+  "every action refused by policy (RN)": 2111,
   "batch contact budget exhausted (N/N)": 1365,
   "per-case contact limit reached (N)": 768,
+  "no action cleared its EV floor": 681,
   "no positive-EV free action": 470,
   "amount N >= high-value threshold N": 161,
   "case aged out of the observation window": 121,
+  "no permitted action cleared its EV floor": 85,
+  "every action refused by policy (RN RN)": 74,
   "success landed Nh after failure, outside the Nh window": 30,
   "payment succeeded then was reversed": 30
  },
  "tests": {
   "ran": true,
-  "passed": 137,
+  "passed": 140,
   "failed": 0,
   "by_file": {
    "test_policy.py": {
@@ -1989,7 +1996,7 @@
     "failed": 0
    },
    "test_state_machine.py": {
-    "passed": 34,
+    "passed": 37,
     "failed": 0
    },
    "test_allocation.py": {

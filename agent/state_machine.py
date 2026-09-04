@@ -347,11 +347,35 @@ class StateMachine:
     # ---------------------------------------------------------------- settle
 
     def _skip_reason(self, plan: Plan) -> str:
-        """Why a case was deliberately not pursued. Computed, never a label."""
+        """Why a case was deliberately not pursued. Computed, never a label.
+
+        The order matters, and getting it wrong produces a confidently wrong
+        explanation. A case whose every treatment action was refused by a policy
+        rule is not a case where "nothing cleared the EV floor" -- it is a case
+        the policy engine stopped, and on a large payment the difference is the
+        whole story. Policy is therefore checked first.
+        """
+        treatments = [a for a in plan.alternatives if a.action != "no_action"]
+        blocked = [a for a in treatments if a.rejection_type == "policy"]
+
+        if treatments and len(blocked) == len(treatments):
+            rules = sorted({a.blocked_by for a in blocked if a.blocked_by})
+            best = max(treatments, key=lambda a: a.incremental_ev)
+            return (f"every action refused by policy "
+                    f"({', '.join(rules)}); forgoes {best.action} at "
+                    f"incremental EV {best.incremental_ev:.2f}")
+
+        if blocked:
+            rules = sorted({a.blocked_by for a in blocked if a.blocked_by})
+            return (f"no permitted action cleared its EV floor; best incremental "
+                    f"EV {plan.incremental_ev:.2f}, with "
+                    f"{len(blocked)} action(s) refused by {', '.join(rules)}")
+
         if plan.budget_rank is not None and not plan.won_contact:
             return (f"no positive-EV free action; best contact ranked "
                     f"{plan.budget_rank} of {plan.budget_contenders}, "
                     f"outside the budget")
+
         return (f"no action cleared its EV floor; best incremental EV "
                 f"{plan.incremental_ev:.2f}")
 

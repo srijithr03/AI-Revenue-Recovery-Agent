@@ -346,3 +346,56 @@ def test_audit_trail_is_append_only():
     assert len(trail.events("A")) == 2
     assert not any(m.startswith(("remove", "delete", "update", "pop", "clear"))
                    for m in dir(trail))
+
+
+# ===========================================================================
+# Skip reasons must name the cause that actually applied
+# ===========================================================================
+
+def _plan_with_alternatives(blocked_rules, evs, budget_rank=None):
+    from agent.valuation import Alternative
+    alts = [Alternative(action="no_action", uplift=0.0, p_natural=0.3,
+                        p_treated=0.3, cost=0.0, consumes_contact=False,
+                        incremental_ev=0.0, selected=True)]
+    for action, ev in evs.items():
+        rule_id = blocked_rules.get(action)
+        alts.append(Alternative(
+            action=action, uplift=0.05, p_natural=0.3, p_treated=0.35,
+            cost=2.0, consumes_contact=action.startswith(("sms", "whatsapp",
+                                                          "method", "human")),
+            incremental_ev=ev,
+            rejection_type="policy" if rule_id else "ev_floor",
+            rejection_detail=f"blocked by {rule_id}" if rule_id else "below floor",
+            blocked_by=rule_id))
+    return Plan(case_id="REC-1", action="no_action", alternatives=alts,
+                budget_rank=budget_rank, budget_contenders=90)
+
+
+def test_skip_reason_names_the_rule_when_every_action_is_blocked(eng):
+    """A large payment the policy engine timed out is not a payment that
+    'failed to clear its EV floor'. Reporting it that way hides a stopping rule
+    firing on real money."""
+    sm = StateMachine(eng, FakeExecutor(), AuditTrail(), BudgetTracker(10), 40.0)
+    plan = _plan_with_alternatives(
+        {a: "R7" for a in ("retry_immediate", "method_update_request")},
+        {"retry_immediate": -1535.24, "method_update_request": 4180.06})
+    reason = sm._skip_reason(plan)
+    assert "R7" in reason
+    assert "every action refused by policy" in reason
+    assert "4180.06" in reason, "must surface the EV it deliberately forwent"
+
+
+def test_skip_reason_falls_back_to_ev_floor_when_nothing_is_blocked(eng):
+    sm = StateMachine(eng, FakeExecutor(), AuditTrail(), BudgetTracker(10), 40.0)
+    plan = _plan_with_alternatives({}, {"retry_immediate": 0.2})
+    reason = sm._skip_reason(plan)
+    assert "EV floor" in reason and "R" not in reason.replace("REC", "")
+
+
+def test_skip_reason_reports_partial_blocking_distinctly(eng):
+    sm = StateMachine(eng, FakeExecutor(), AuditTrail(), BudgetTracker(10), 40.0)
+    plan = _plan_with_alternatives(
+        {"sms_payment_link": "R3"},
+        {"retry_immediate": 0.1, "sms_payment_link": 900.0})
+    reason = sm._skip_reason(plan)
+    assert "R3" in reason and "refused" in reason
