@@ -1,14 +1,14 @@
 {
  "run": {
   "seed": 8675309,
-  "generated_at": "2026-09-04 20:06:31 IST",
-  "duration_seconds": 163.21,
+  "generated_at": "2026-09-04 20:25:47 IST",
+  "duration_seconds": 145.89,
   "python": "3.11.9",
   "n_world": 16000,
   "n_holdout": 12000,
   "n_train": 4000,
   "n_history": 25000,
-  "throughput_cases_per_second": 280224.6,
+  "throughput_cases_per_second": 236290.7,
   "ui_slice": 1500
  },
  "execution": {
@@ -101,7 +101,7 @@
     "gap": -0.0048
    }
   ],
-  "duration_seconds": 0.043
+  "duration_seconds": 0.051
  },
  "uplift": {
   "reliability": [
@@ -1961,7 +1961,12 @@
  "skipped": {
   "n": 3421,
   "value_at_risk": 12492950.07,
-  "recovered_anyway": 529236.58
+  "recovered_anyway": 529236.58,
+  "revenue_rate": 0.0424,
+  "cases_recovered": 163,
+  "case_rate": 0.0476,
+  "control_revenue_rate": 0.2034,
+  "control_case_rate": 0.2259
  },
  "stop_reasons": {
   "no action cleared its EV floor": 2951,

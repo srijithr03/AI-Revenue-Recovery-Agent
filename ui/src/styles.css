@@ -1,0 +1,352 @@
+/* Financial operations control surface.
+ *
+ * The design goal is not to impress. It is to look like a system that RAN,
+ * rather than a screen that was DESIGNED. Five functional colours, three
+ * semantic accents used only for state, hairline borders as the only
+ * structural device, and a sans/mono split that does most of the work of
+ * making this read as an operations tool rather than a dashboard template.
+ */
+
+:root {
+  --surface: #ffffff;
+  --surface-alt: #f7f7f5;
+  --border: #e3e2dd;
+  --text: #1a1a18;
+  --text-muted: #6b6a65;
+
+  /* Semantic accents. State only -- never decoration, never chart series. */
+  --recovered: #0f6e56;
+  --stopped: #854f0b;
+  --blocked: #a32d2d;
+
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+
+  --rail: 240px;
+  --page: 1280px;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Every number, ID, timestamp, state name and error code is monospace.
+ * Monospace aligns digits into columns, which is how anyone who works with
+ * financial data expects to see them. */
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--text-muted); }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+
+a { color: var(--text); }
+
+/* The only motion in the build. */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+
+/* ---------------------------------------------------------------- layout */
+
+/* App shell: the viewport is fixed for a desktop demo, so the rail is always
+ * present and only the main pane scrolls. A sticky rail inside a
+ * document-scrolling flex container drifted once the page grew past a screen. */
+.app { display: flex; height: 100vh; overflow: hidden; }
+
+.rail {
+  width: var(--rail);
+  flex: 0 0 var(--rail);
+  border-right: 1px solid var(--border);
+  padding: 24px 0 24px 0;
+  overflow-y: auto;
+}
+
+.rail-head { padding: 0 16px 24px 16px; }
+.rail-title { font-size: 13px; font-weight: 500; }
+.rail-seed { font-family: var(--mono); font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+.rail-nav { display: flex; flex-direction: column; }
+
+.rail-item {
+  display: block;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+}
+.rail-item:hover { color: var(--text); }
+.rail-item.active { color: var(--text); border-left-color: var(--text); font-weight: 500; }
+
+.rail-foot {
+  padding: 24px 16px 0 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  margin-top: 24px;
+}
+
+.main { flex: 1; min-width: 0; overflow-y: auto; }
+.page { max-width: var(--page); padding: 24px 32px 48px 32px; }
+
+.section { margin-bottom: 32px; }
+.section-head { font-size: 15px; font-weight: 500; margin: 0 0 12px 0; }
+.section-note { font-size: 12px; color: var(--text-muted); margin: -8px 0 12px 0; max-width: 780px; }
+
+.page-title { font-size: 20px; font-weight: 500; margin: 0 0 4px 0; }
+.page-figure { font-size: 26px; font-weight: 500; font-family: var(--mono); }
+
+/* ---------------------------------------------------------------- header strip */
+
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+  margin-bottom: 24px;
+}
+.strip-item { display: flex; flex-direction: column; gap: 4px; }
+.strip-label { font-size: 12px; color: var(--text-muted); }
+.strip-value { font-family: var(--mono); font-size: 13px; }
+
+/* ---------------------------------------------------------------- metrics */
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.metric { background: var(--surface-alt); padding: 16px; border-radius: 6px; }
+.metric-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+.metric-value { font-family: var(--mono); font-size: 20px; font-weight: 500; line-height: 1.2; }
+.metric-sub { font-family: var(--mono); font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+/* ---------------------------------------------------------------- tables */
+
+.table-wrap { border: 1px solid var(--border); border-radius: 0; overflow: auto; }
+.table-scroll { max-height: 720px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  text-align: left;
+  padding: 8px 12px;
+  white-space: nowrap;
+  z-index: 1;
+}
+thead th.sortable { cursor: pointer; user-select: none; }
+thead th.sortable:hover { color: var(--text); }
+thead th.active { color: var(--text); }
+thead th.right { text-align: right; }
+
+tbody td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
+  height: 36px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+tbody tr { background: var(--surface); }
+tbody tr.clickable { cursor: pointer; }
+tbody tr.clickable:hover { background: var(--surface-alt); transition: background 100ms linear; }
+tbody tr.selected td:first-child { box-shadow: inset 2px 0 0 0 var(--text); }
+
+tbody td.right { text-align: right; }
+
+.caret { font-size: 9px; margin-left: 4px; }
+
+/* Compact table variant, for the evaluation screen. */
+.table-plain td, .table-plain th { padding: 8px 12px; }
+.table-plain td { height: auto; }
+
+/* ---------------------------------------------------------------- chips */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.chip-recovered { background: rgba(15, 110, 86, 0.12); color: var(--recovered); }
+.chip-stopped { background: rgba(133, 79, 11, 0.12); color: var(--stopped); }
+.chip-escalated { background: rgba(133, 79, 11, 0.12); color: var(--stopped); }
+.chip-ineligible { background: rgba(107, 106, 101, 0.12); color: var(--text-muted); }
+.chip-blocked { background: rgba(163, 45, 45, 0.12); color: var(--blocked); }
+.chip-plain { background: var(--surface-alt); color: var(--text-muted); }
+
+.neg { color: var(--blocked); }
+.pos { color: var(--recovered); }
+
+/* ---------------------------------------------------------------- filters */
+
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+
+.chip-toggle {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--sans);
+  font-size: 12px;
+  cursor: pointer;
+}
+.chip-toggle:hover { color: var(--text); }
+.chip-toggle.active { border-color: var(--text); background: var(--surface-alt); color: var(--text); }
+
+select {
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 12px;
+  padding: 0 4px;
+}
+
+/* ---------------------------------------------------------------- funnel */
+
+.funnel { display: flex; border: 1px solid var(--border); }
+.funnel-stage { flex: 1; padding: 12px; border-right: 1px solid var(--border); }
+.funnel-stage:last-child { border-right: none; }
+.funnel-label { font-size: 12px; color: var(--text-muted); }
+.funnel-count { font-family: var(--mono); font-size: 20px; font-weight: 500; margin-top: 4px; }
+.funnel-note { font-family: var(--mono); font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+/* ---------------------------------------------------------------- arms */
+
+.arm-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 150px 130px 150px;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+}
+.arm-row:last-child { border-bottom: none; }
+.arm-name { font-family: var(--mono); font-size: 13px; }
+.arm-desc { font-size: 12px; color: var(--text-muted); }
+
+/* ---------------------------------------------------------------- policy bar */
+
+.policy-bar {
+  border-left: 2px solid var(--text);
+  background: var(--surface-alt);
+  padding: 12px 16px;
+  font-size: 13px;
+}
+.policy-bar.blocked { border-left-color: var(--blocked); }
+.policy-bar.escalated { border-left-color: var(--stopped); }
+.policy-line { font-family: var(--mono); font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+/* ---------------------------------------------------------------- stage row */
+
+.stages { display: flex; border: 1px solid var(--border); margin-bottom: 12px; }
+.stage {
+  flex: 1;
+  padding: 8px 12px;
+  border-right: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--border);
+  text-align: center;
+}
+.stage:last-child { border-right: none; }
+.stage.reached { color: var(--text); }
+.stage.current { color: var(--text); background: var(--surface-alt); font-weight: 500; }
+
+/* ---------------------------------------------------------------- audit log */
+
+.log { border: 1px solid var(--border); max-height: 520px; overflow: auto; }
+.log-row {
+  display: grid;
+  grid-template-columns: 130px 120px 90px 1fr;
+  gap: 12px;
+  height: 28px;
+  align-items: center;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.log-row:last-child { border-bottom: none; }
+.log-detail { overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------------------------------------------------------------- kv table */
+
+.kv { width: 100%; border-collapse: collapse; }
+.kv td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.kv td:first-child { width: 210px; color: var(--text-muted); font-size: 12px; }
+.kv tr:last-child td { border-bottom: none; }
+
+/* ---------------------------------------------------------------- states */
+
+.loading, .empty, .error {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 24px 0;
+}
+.error { color: var(--blocked); }
+.error code {
+  font-family: var(--mono);
+  background: var(--surface-alt);
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+
+/* ---------------------------------------------------------------- misc */
+
+.back { font-size: 12px; color: var(--text-muted); text-decoration: none; display: inline-block; margin-bottom: 12px; }
+.back:hover { color: var(--text); }
+
+.badges { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+
+.callout {
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--text);
+  padding: 12px 16px;
+  font-size: 13px;
+  max-width: 900px;
+}
+.callout p { margin: 0 0 8px 0; }
+.callout p:last-child { margin-bottom: 0; }
+
+ul.plain { margin: 0; padding-left: 16px; }
+ul.plain li { margin-bottom: 8px; }
+ul.plain li:last-child { margin-bottom: 0; }
+
+/* Focus ring on everything interactive. Removing the outline without
+ * replacing it is what makes a build feel unfinished. */
+a:focus-visible, button:focus-visible, tr:focus-visible, select:focus-visible, th:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.chart-wrap { border: 1px solid var(--border); padding: 16px; }
+.chart-legend { display: flex; gap: 16px; font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
+.legend-key { display: inline-block; width: 10px; height: 10px; margin-right: 4px; vertical-align: middle; }

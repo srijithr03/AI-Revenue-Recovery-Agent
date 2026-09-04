@@ -360,10 +360,20 @@ def main() -> int:
                if h.plans[o.case_id].action == "no_action"]
     skipped_value = sum(cases_by_id[o.case_id]["amount"] for o in skipped)
     skipped_recovered = sum(o.amount_confirmed for o in skipped)
+    skipped_cases_recovered = sum(1 for o in skipped if o.confirmed)
+    # Compare like with like. A revenue-weighted rate on the skipped cases must be
+    # set against the control arm's REVENUE-weighted rate, not against its
+    # case-count recovery rate. Those are different units, and mixing them
+    # overstates the point in exactly the direction that flatters the agent.
+    control_revenue_rate = (pres["control"].gross_recovered /
+                            max(pres["control"].at_risk, 1))
     print(f"\n  {len(skipped):,} cases deliberately not pursued, "
           f"Rs {skipped_value:,.0f} at risk")
-    print(f"  of which Rs {skipped_recovered:,.0f} came back anyway with no action "
-          f"({skipped_recovered / max(skipped_value, 1):.1%})")
+    print(f"  of which Rs {skipped_recovered:,.0f} came back anyway with no action")
+    print(f"      by revenue  {skipped_recovered / max(skipped_value, 1):>6.1%} of skipped "
+          f"value, against {control_revenue_rate:.1%} across the control arm")
+    print(f"      by case     {skipped_cases_recovered / max(len(skipped), 1):>6.1%} of skipped "
+          f"cases, against {pres['control'].recovery_rate:.1%} across the control arm")
 
     # ---- artifacts -------------------------------------------------------
     rule("ARTIFACTS")
@@ -504,6 +514,11 @@ def main() -> int:
             "n": len(skipped),
             "value_at_risk": round(skipped_value, 2),
             "recovered_anyway": round(skipped_recovered, 2),
+            "revenue_rate": round(skipped_recovered / max(skipped_value, 1), 4),
+            "cases_recovered": skipped_cases_recovered,
+            "case_rate": round(skipped_cases_recovered / max(len(skipped), 1), 4),
+            "control_revenue_rate": round(control_revenue_rate, 4),
+            "control_case_rate": round(pres["control"].recovery_rate, 4),
         },
         "stop_reasons": dict(stops.most_common()),
     }

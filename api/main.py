@@ -35,28 +35,40 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_cache: dict[str, Any] = {}
+# name -> (mtime_at_load, parsed)
+_cache: dict[str, tuple[float, Any]] = {}
 
 
 def artifact(name: str) -> Any:
-    """Load an artifact, with a clear error rather than a stack trace."""
-    if name in _cache:
-        return _cache[name]
+    """Load an artifact, with a clear error rather than a stack trace.
+
+    Cached on the file's mtime rather than forever. Caching forever meant that
+    re-running the evaluation left a long-running server serving the previous
+    run's numbers, which is a quiet way to demo a stale result.
+    """
     path = os.path.join(RESULTS, name)
     if not os.path.exists(path):
+        _cache.pop(name, None)
         raise HTTPException(
             status_code=503,
             detail=f"eval/results/{name} not found. Run `make eval` "
                    f"(or `python run.py eval`).")
+
+    mtime = os.path.getmtime(path)
+    hit = _cache.get(name)
+    if hit is not None and hit[0] == mtime:
+        return hit[1]
+
     try:
         with open(path, encoding="utf-8") as fh:
-            _cache[name] = json.load(fh)
+            parsed = json.load(fh)
     except json.JSONDecodeError as exc:
         raise HTTPException(
             status_code=503,
             detail=f"eval/results/{name} is malformed ({exc}). "
                    f"Re-run `make eval`.")
-    return _cache[name]
+    _cache[name] = (mtime, parsed)
+    return parsed
 
 
 @app.get("/api/health")
