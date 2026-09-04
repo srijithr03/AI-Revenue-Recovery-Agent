@@ -277,9 +277,21 @@ class Allocator:
             plan.budget_cutoff_ev = cutoff_ev
 
             if rank <= budget:
-                # The contact wins the slot and replaces the free retry.
+                # The contact wins the slot and replaces the free retry. The
+                # displaced action must be given a computed reason -- otherwise
+                # it appears in the alternatives table as neither selected nor
+                # rejected, which is a hole in the one view that is supposed to
+                # account for every option.
+                displaced = plan.action
                 for a in plan.alternatives:
                     a.selected = False
+                    if (a.action == displaced and displaced != "no_action"
+                            and a.rejection_type is None):
+                        a.rejection_type = "lower_ev"
+                        a.rejection_detail = (
+                            f"superseded by {alt.action}, which adds "
+                            f"{marginal:.2f} more at rank {rank} of "
+                            f"{n_contenders}")
                 alt.selected = True
                 alt.rejection_type = None
                 alt.rejection_detail = ""

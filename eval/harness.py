@@ -149,7 +149,12 @@ class Harness:
         self.seed = seed
         self.quiet = quiet
         self.engine = PolicyEngine()
-        self.trail = AuditTrail()
+        # One trail PER ARM. Sharing a single trail keyed by case id meant that
+        # in the paired design a case accumulated control, naive and agent
+        # events interleaved in one log -- which reads as a single incoherent
+        # sequence and is exactly the kind of thing an audit trail must not do.
+        self.trails: dict[str, AuditTrail] = {a: AuditTrail() for a in ARMS}
+        self.trail = self.trails["agent"]
         self.policy_violations = 0
         self.plans: dict[str, Plan] = {}
 
@@ -210,12 +215,13 @@ class Harness:
                               confirmed=v.confirmed,
                               amount_confirmed=v.amount_confirmed,
                               execution_mode="simulated")
-            self.trail.append(case["case_id"], "SCORED", "rules",
-                              "control arm: no action taken", "INELIGIBLE")
+            trail = self.trails["control"]
+            trail.append(case["case_id"], "SCORED", "rules",
+                         "control arm: no action taken", "INELIGIBLE")
             if v.confirmed:
-                self.trail.append(case["case_id"], "RECOVERED", "verifier",
-                                  f"recovered naturally, {v.amount_confirmed:.2f}, "
-                                  f"with no action taken", "INELIGIBLE")
+                trail.append(case["case_id"], "RECOVERED", "verifier",
+                             f"recovered naturally, {v.amount_confirmed:.2f}, "
+                             f"with no action taken", "INELIGIBLE")
             res.add(case, out)
         return res
 
@@ -232,7 +238,7 @@ class Harness:
         res = ArmResult("naive")
         res.budget = 0  # unconstrained by design
         budget = BudgetTracker(10 ** 9)
-        sm = StateMachine(self.engine, executor, self.trail, budget,
+        sm = StateMachine(self.engine, executor, self.trails["naive"], budget,
                           self.annoyance_cost, respect_budget=False)
         for case in cases:
             plan = Plan(case_id=case["case_id"], action="retry_immediate",
@@ -259,7 +265,7 @@ class Harness:
         self.plans.update(plans)
 
         budget = BudgetTracker(budget_n)
-        sm = StateMachine(self.engine, executor, self.trail, budget,
+        sm = StateMachine(self.engine, executor, self.trails["agent"], budget,
                           self.annoyance_cost, respect_budget=True)
         for case in cases:
             out = sm.run_case(case, diagnoses[case["case_id"]],
