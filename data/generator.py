@@ -69,13 +69,40 @@ BASE_NATURAL_RECOVERY = {
 
 # A2 -- unconditional mix of failure causes.  Conditioned further on customer
 # features below, so the realised mix differs from this prior.
+#
+# CALIBRATED against NPCI's published UPI decline split rather than assumed.
+# NPCI reports two decline families monthly, bank-wise:
+#
+#   TD (technical decline)  -- bank / NPCI infrastructure.  Published system-wide
+#                              at roughly 0.3-0.8% of all UPI transactions.
+#   BD (business decline)   -- customer-side: insufficient balance, wrong PIN,
+#                              expired mandate.  Target ceiling 5%.
+#
+#   Source: https://www.npci.org.in/what-we-do/upi/upi-ecosystem-statistics
+#           https://ckandev.indiadataportal.com/dataset/national-payments-corporation-of-india-npci
+#
+# Taking TD ~0.4% against BD ~4.1%, TD is roughly 9% of UPI *failures* and BD
+# roughly 91%.  Two corrections applied before using that split here:
+#
+#   1. NPCI's TD is narrowly bank/NPCI-side.  It excludes gateway- and PSP-side
+#      timeouts, which a merchant's failed-payment queue sees as transient too.
+#      So 9% is a LOWER bound on `temporary_failure`, not the value.
+#   2. This batch is not UPI-only (A3), and card failures skew harder toward
+#      instrument problems than UPI does.
+#
+# Net effect versus the previous uncalibrated guess: `temporary_failure` falls
+# 0.26 -> 0.19 and `insufficient_funds` rises 0.24 -> 0.31, because NPCI's data
+# says business declines dominate by roughly ten to one and insufficient balance
+# is the largest single BD cause.  Both moves make the world HARDER for the
+# agent: the class with the highest natural recovery gets rarer, and the class
+# where retry-timing matters most gets commoner.
 FAILURE_CLASS_PRIOR = {
-    "temporary_failure": 0.26,
-    "insufficient_funds": 0.24,
-    "authentication_failure": 0.20,
-    "invalid_method": 0.13,
+    "temporary_failure": 0.19,
+    "insufficient_funds": 0.31,
+    "authentication_failure": 0.22,
+    "invalid_method": 0.12,
     "repeated_failure": 0.10,
-    "risk_blocked": 0.07,
+    "risk_blocked": 0.06,
 }
 
 # A3 -- payment method mix, weighted toward UPI as is typical for Indian
@@ -160,17 +187,74 @@ P_ANNOYANCE_GIVEN_NOT_FRAGILE = 0.035
 P_CHRONIC_FAILER = 0.22
 P_NEW_CUSTOMER = 0.22
 
-# A6 -- gateway error codes that map unambiguously to a cause.
-GATEWAY_CODES = {
-    "temporary_failure": ["GW_TIMEOUT", "BANK_UNAVAILABLE", "UPI_TXN_TIMEOUT", "GATEWAY_ERROR"],
-    "insufficient_funds": ["INSUFFICIENT_FUNDS", "NO_BALANCE", "U31"],
-    "invalid_method": ["CARD_EXPIRED", "INVALID_VPA", "ACCOUNT_CLOSED", "MANDATE_REVOKED"],
-    "authentication_failure": ["OTP_TIMEOUT", "3DS_FAILED", "PIN_INCORRECT", "AUTH_ABANDONED"],
-    "risk_blocked": ["RISK_DECLINED", "FRAUD_SUSPECTED", "VELOCITY_LIMIT"],
-    "repeated_failure": ["REPEAT_DECLINE"],
+# A6 -- gateway error codes.
+#
+# These are Razorpay's DOCUMENTED payment error reasons, not invented strings,
+# and they are keyed by METHOD because the real taxonomy is method-specific:
+# `card_declined` does not exist on a UPI payment and `invalid_vpa` does not
+# exist on a card.  Sources:
+#   https://razorpay.com/docs/errors/payments/upi/
+#   https://razorpay.com/docs/errors/payments/cards/
+#
+# Two structural consequences, both deliberate and both realistic:
+#
+#   1. `repeated_failure` has NO code under any method.  No gateway emits
+#      "this is the fifth consecutive failure on this instrument" -- it reports
+#      the proximate symptom, every time.  That class is therefore reachable
+#      only from customer history, which is exactly what the L1 contradiction
+#      rule reads.  Under the previous invented taxonomy a `REPEAT_DECLINE`
+#      code existed and made the class trivially readable; it does not exist in
+#      any real gateway and it has been removed.
+#
+#   2. UPI's published taxonomy has no dedicated risk/fraud reason.  A UPI risk
+#      block surfaces as the generic `payment_declined`, while cards get the
+#      specific `payment_risk_check_failed`.  That asymmetry is real, and it is
+#      why `payment_declined` is diagnosed at reduced confidence in L1.
+GATEWAY_CODES: dict[str, dict[str, list[str]]] = {
+    "upi": {
+        "temporary_failure": ["bank_technical_error", "gateway_technical_error",
+                              "payment_timed_out"],
+        "insufficient_funds": ["insufficient_funds"],
+        "invalid_method": ["invalid_vpa", "vpa_resolution_failed"],
+        "authentication_failure": ["payment_cancelled",
+                                   "payment_collect_request_expired"],
+        "risk_blocked": ["payment_declined"],
+    },
+    "card": {
+        "temporary_failure": ["gateway_technical_error", "bank_technical_error",
+                              "payment_timed_out"],
+        "insufficient_funds": ["insufficient_funds", "transaction_limit_exceeded"],
+        "invalid_method": ["card_expired", "card_not_enrolled",
+                           "card_disabled_for_online_payments",
+                           "debit_instrument_inactive", "debit_instrument_blocked"],
+        "authentication_failure": ["authentication_failed", "incorrect_cvv",
+                                   "payment_cancelled"],
+        "risk_blocked": ["payment_risk_check_failed"],
+    },
+    "netbanking": {
+        "temporary_failure": ["bank_technical_error", "gateway_technical_error",
+                              "payment_timed_out"],
+        "insufficient_funds": ["insufficient_funds"],
+        "invalid_method": ["debit_instrument_inactive"],
+        "authentication_failure": ["authentication_failed", "payment_cancelled"],
+        "risk_blocked": ["payment_risk_check_failed"],
+    },
+    "wallet": {
+        "temporary_failure": ["gateway_technical_error", "payment_timed_out"],
+        "insufficient_funds": ["insufficient_funds"],
+        "invalid_method": ["debit_instrument_inactive"],
+        "authentication_failure": ["authentication_failed", "payment_cancelled"],
+        "risk_blocked": ["payment_risk_check_failed"],
+    },
 }
 
-UNMAPPED_CODE = "UNMAPPED"
+# The genuinely uninformative reason a gateway falls back to when it cannot
+# classify the failure.  `payment_failed` is Razorpay's documented catch-all
+# ("general bank decline"), and it is deliberately absent from CODE_TO_CLASS:
+# it carries no diagnostic content, so it routes to the LLM path with nothing
+# but free text and customer history to work from.  The ~15% ambiguous slice
+# rides on this rather than on an invented "UNMAPPED" sentinel.
+UNMAPPED_CODE = "payment_failed"
 
 # A7 -- free-text gateway messages for the ~15% ambiguous slice.  Written in the
 # register real gateways actually use: vague, passive, and unhelpful.
@@ -423,18 +507,39 @@ def generate(n: int = N_CASES, seed: int | None = None
         else:
             # A15 -- a gateway reports the PROXIMATE symptom, not the actionable
             # cause.  A card that has failed five times running still returns
-            # INSUFFICIENT_FUNDS on the sixth attempt; the code is accurate and
+            # `insufficient_funds` on the sixth attempt; the code is accurate and
             # the diagnosis it implies is wrong.  Retrying is pointless, and a
             # method update is the move.  Modelling this is what gives the
             # contradictory-signal rule (L1) something real to catch.
-            if failure_class == "repeated_failure" and rng.random() < 0.65:
+            #
+            # Under the real Razorpay taxonomy this is not a 65% tendency but a
+            # certainty: no gateway has a "repeated failure" reason at all (A6),
+            # so the class ALWAYS presents as something else and is reachable
+            # only from customer history.
+            if failure_class == "repeated_failure":
                 symptom = str(rng.choice(
                     ["insufficient_funds", "invalid_method", "authentication_failure"],
                     p=[0.50, 0.30, 0.20]))
-                gateway_code = str(rng.choice(GATEWAY_CODES[symptom]))
+                gateway_code = str(rng.choice(GATEWAY_CODES[method][symptom]))
                 misleading_code = True
             else:
-                gateway_code = str(rng.choice(GATEWAY_CODES[failure_class]))
+                gateway_code = str(rng.choice(GATEWAY_CODES[method][failure_class]))
+
+            # A16 -- generic-decline leakage.  UPI has no dedicated risk reason,
+            # so every UPI risk block already surfaces as the bare
+            # `payment_declined` (A6).  But that same bare reason is also what a
+            # bank returns when it declines for a cause that DOES have its own
+            # code -- it simply chose not to be specific.  Without this leakage
+            # `payment_declined` would be perfectly diagnostic of a risk block in
+            # this world, which is precisely the kind of accidental giveaway that
+            # makes a synthetic evaluation circular.  Measured at 15%, the modal
+            # cause of `payment_declined` stays risk_blocked at roughly 0.6 --
+            # low-information, as a generic reason should be.
+            if (method == "upi"
+                    and failure_class in ("insufficient_funds", "invalid_method")
+                    and rng.random() < 0.15):
+                gateway_code = "payment_declined"
+
             gateway_message = ""
 
         # ---- compliance flags -------------------------------------------------

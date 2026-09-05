@@ -23,7 +23,7 @@ Read this alongside `data/generator.py`, where each constant carries the tag
 | A4 treatment odds multipliers | High | Changes which action wins per class. The agent adapts (it fits the table from data); the naive arm does not. |
 | A5 annoyance trait prevalence | Medium | Changes how much targeting is worth. More annoyance-prone customers favours the agent. |
 | A9 chronic-failer share | Medium | Shifts the population toward harder cases; lowers absolute recovery in every arm. |
-| A2 failure-class mix | Low | Reweights the batch. Per-class results are reported separately and are unaffected. |
+| A2 failure-class mix | Medium | Now calibrated to NPCI TD/BD rather than assumed. Recalibrating it moved agent-vs-naive from a tie to a significant loss, so it is not the "Low" it was rated when it was a guess. |
 | A3 payment-method mix | Negligible | Method is descriptive only; nothing in the decision path keys off it. |
 | A11/A12 send costs (SMS, WhatsApp) | Negligible | Dominated ~50x by the annoyance cost. See note under A10. |
 
@@ -71,10 +71,24 @@ valuable. Relative arm ordering is substantially more robust than the levels.
 
 ## A2 - Failure-class mix
 
-Unconditional prior: `temporary_failure` 0.26, `insufficient_funds` 0.24,
-`authentication_failure` 0.20, `invalid_method` 0.13, `repeated_failure` 0.10,
-`risk_blocked` 0.07. Conditioned further on customer features in
+Unconditional prior: `insufficient_funds` 0.31, `authentication_failure` 0.22,
+`temporary_failure` 0.19, `invalid_method` 0.12, `repeated_failure` 0.10,
+`risk_blocked` 0.06. Conditioned further on customer features in
 `_draw_failure_class`, so the realised mix differs (see `make verify`).
+
+**These values were RECALIBRATED against NPCI's published decline split.** The
+earlier prior put `temporary_failure` at 0.26 and `insufficient_funds` at 0.24 on
+reasoning alone. NPCI's data says business declines outnumber technical ones by
+roughly ten to one, and insufficient balance is the largest single business
+decline cause, so the two swapped rank: `temporary_failure` 0.26 -> 0.19 and
+`insufficient_funds` 0.24 -> 0.31.
+
+Both moves make the world **harder** for the agent, not easier. The class with
+the highest natural recovery becomes rarer, and the class where blanket
+contacting pays off most becomes commoner. The measured effect on the headline
+was to move agent-vs-naive from -Rs 6.60 (a statistical tie) to -Rs 43.57 (a
+significant loss). That is the correct direction for a calibration to push a
+result the author would have preferred to keep.
 
 **Grounding.** NPCI distinguishes **Technical Declines** (infrastructure: bank or
 NPCI systems unavailable, network issues) from **Business Declines** (invalid
@@ -84,14 +98,18 @@ fallen to roughly 0.3-0.8%
 ([NPCI UPI ecosystem statistics](https://www.npci.org.in/what-we-do/upi/upi-ecosystem-statistics),
 [ZeeBiz on the 0.8% TD figure](https://www.zeebiz.com/economy-infra/news-only-08-of-upi-transactions-face-technical-declines-now-npci-327217)).
 
-Taken literally, TD/(TD+BD) implies technical causes are roughly 14% of all
-failures. This model puts `temporary_failure` at 22-26%, which is **higher**, for
-a stated reason: `temporary_failure` here spans acquirer-side and gateway-side
-timeouts as well as issuer-side technical declines, and a merchant-facing view
-includes failures NPCI does not attribute to the issuing bank. A reader who
-believes the true share is 14% should read the per-class results table rather
-than the batch aggregate; per-class recovery rates are reported separately for
-exactly this reason.
+Taken literally, TD/(TD+BD) implies technical causes are roughly 9-14% of all
+failures. This model puts `temporary_failure` at 0.19 in the prior (15.6%
+realised), which is still **higher** than the literal reading, for a stated
+reason: `temporary_failure` here spans acquirer-side and gateway-side timeouts as
+well as issuer-side technical declines, and a merchant-facing view includes
+failures NPCI does not attribute to the issuing bank. NPCI's TD is a lower bound
+on this class, not its value.
+
+A reader who believes the true share is 9% should read the per-class results
+table rather than the batch aggregate; per-class recovery rates are reported
+separately for exactly this reason. The direction of the residual disagreement is
+also known: a smaller `temporary_failure` share makes the world harder still.
 
 **Deliberate deviation.** The class mix here is *not* a payments-industry mix by
 transaction volume. It is a mix over a **queue of failures a recovery team would
@@ -167,19 +185,79 @@ invented magnitude.
 
 ## A6/A7 - Gateway codes and ambiguous free text
 
-Mapped codes (`INSUFFICIENT_FUNDS`, `CARD_EXPIRED`, `OTP_TIMEOUT`, `U31`, ...)
-are modelled on the shape of real gateway and UPI response codes.
+**The codes are Razorpay's documented payment error reasons, not invented
+strings.** Sources:
+[UPI error codes](https://razorpay.com/docs/errors/payments/upi/),
+[card error codes](https://razorpay.com/docs/errors/payments/cards/),
+[full payment error list](https://razorpay.com/docs/errors/payments/list/).
 
-**15.0%** of records carry no usable code, only free text. These messages are
-written in the register real gateways use - passive, vague, non-committal
-("The transaction could not be completed at this time", "The issuing bank
-declined the transaction"). Each maps to a known true class so diagnosis
-accuracy stays measurable.
+An earlier version used plausible-looking inventions (`GW_TIMEOUT`,
+`OTP_TIMEOUT`, `AUTH_ABANDONED`, `REPEAT_DECLINE`). They read correctly to a
+non-specialist and would read as fabricated to anyone who works with the real API
+daily, which for this submission is the entire audience.
 
-**Why 15%.** High enough that the LLM path materially affects batch outcomes,
-low enough that the deterministic path still carries the large majority - which
-is the honest architecture. Using an LLM on a record that says
-`INSUFFICIENT_FUNDS` would be waste dressed as sophistication.
+**Codes are keyed by payment method**, because the real taxonomy is: `invalid_vpa`
+and `vpa_resolution_failed` exist only on UPI, `card_expired` and `incorrect_cvv`
+only on cards. Emitting `card_declined` on a UPI payment would be a more visible
+error than inventing a code, because it is a real string used impossibly.
+
+Three structural consequences follow, all deliberate.
+
+**1. `repeated_failure` has no gateway code under any method.** No real gateway
+emits "this is the fifth consecutive failure on this instrument" - it reports the
+proximate symptom, every time. The class is reachable only from customer history.
+This is strictly harder than the previous world, where an invented
+`REPEAT_DECLINE` made it readable straight off the code.
+
+*This flipped a measured design decision.* The L1 contradiction rule (4+ prior
+failures against a clean symptom code) originally did **not** override the class,
+because under the invented taxonomy overriding was right 44.8% of the time
+against 55.2% for trusting the code. Re-measured under the real taxonomy the
+override is right **69.4%** against 30.6%, so it now ships. Threshold 4 was the
+best cut of 3/4/5/6/7. The reversal is caused entirely by the taxonomy becoming
+real, and the reasoning for both measurements is kept in `agent/diagnosis.py`.
+
+**2. UPI has no dedicated risk/fraud reason.** Cards get the specific
+`payment_risk_check_failed`; a UPI risk block surfaces as the bare
+`payment_declined`. That asymmetry is real, and it is why `payment_declined` is
+diagnosed at reduced confidence.
+
+**3. `payment_declined` also leaks (A16).** If UPI risk blocks were the *only*
+cause emitting `payment_declined`, that code would be perfectly diagnostic of a
+risk block in this world - an accidental giveaway of exactly the kind that makes
+a synthetic evaluation circular. So 15% of UPI `insufficient_funds` and
+`invalid_method` cases emit it too, which is also what real banks do when they
+decline without being specific. Measured result: the modal cause of
+`payment_declined` stays `risk_blocked` at **0.608**, so the code is genuinely
+low-information, as a generic reason should be.
+
+**Confidence values are measured, not chosen.** All four are fitted on the
+training split only:
+
+| Path | Cases | Measured accuracy | Constant |
+|---|---:|---:|---|
+| clean mapped code | 2,803 | 0.8655 | `CONF_MAPPED_CODE = 0.87` |
+| generic `payment_declined` | 334 | 0.6078 | `CONF_GENERIC_CODE = 0.61` |
+| contradicted -> `repeated_failure` | 271 | 0.6790 | `CONF_CONTRADICTION = 0.68` |
+| keyword fallback matched | 363 | 0.6281 | `CONF_FALLBACK_KEYWORD = 0.63` |
+
+**14.6%** of records carry the uninformative catch-all `payment_failed` plus free
+text only. `payment_failed` is Razorpay's real documented general-decline reason
+and is deliberately absent from `CODE_TO_CLASS`, so the ambiguous slice rides on
+a real code rather than an invented `UNMAPPED` sentinel. The messages are written
+in the register real gateways use - passive, vague, non-committal. Each maps to a
+known true class so diagnosis accuracy stays measurable.
+
+**Why ~15%.** High enough that the LLM path materially affects batch outcomes,
+low enough that the deterministic path still carries the large majority - which is
+the honest architecture. Using an LLM on a record that says `insufficient_funds`
+would be waste dressed as sophistication.
+
+**Known simplification.** Every UPI risk block emits `payment_declined`, so that
+class is over-concentrated in one code relative to a real merchant's queue, where
+issuer-specific NPCI decline codes (U-series, Z-series) would also appear. Those
+are not in Razorpay's published merchant-facing taxonomy, so they are not
+modelled rather than being guessed at.
 
 ---
 

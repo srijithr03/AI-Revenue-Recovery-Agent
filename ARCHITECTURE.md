@@ -66,7 +66,7 @@ is designed but not implemented.
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ L8  EVALUATION                    eval/harness.py · run_eval.py         │
 │     three arms · stratified assignment · paired counterfactual          │
-│     bootstrap + Wilson intervals · two sensitivity sweeps               │
+│     bootstrap + Wilson intervals · three sensitivity sweeps             │
 │     may read ground truth — it is the scorer                            │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -96,7 +96,7 @@ strings (`no_action; refund_customer(100000)`), and a fake inaction string
 (`no_action_really`) that must not inherit the free pass real inaction gets.
 
 The LLM is consulted on 15% of records — those with no usable error code.
-Sending `INSUFFICIENT_FUNDS` to a language model would be waste dressed as
+Sending `insufficient_funds` to a language model would be waste dressed as
 sophistication.
 
 ---

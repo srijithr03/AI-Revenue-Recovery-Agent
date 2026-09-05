@@ -4,7 +4,7 @@ Two paths by design:
 
   * DETERMINISTIC.  Gateway error codes that map unambiguously go through a
     lookup table.  This covers ~85% of records and costs nothing.  Sending
-    `INSUFFICIENT_FUNDS` to a language model would be waste dressed as
+    `insufficient_funds` to a language model would be waste dressed as
     sophistication.
 
   * LLM.  Records carrying only free text go to Claude with a structured prompt
@@ -43,10 +43,11 @@ MODEL = "claude-haiku-4-5-20251001"
 # The reliability plot on the evaluation screen is the check on whether they are
 # honest.
 # ---------------------------------------------------------------------------
-CONF_MAPPED_CODE = 0.93        # measured 0.9275 on 3,216 clean mapped cases
-CONF_CONTRADICTION = 0.55      # measured 0.552 on 192 contradicted cases
+CONF_MAPPED_CODE = 0.87        # measured 0.8655 on 2,803 clean mapped cases
+CONF_GENERIC_CODE = 0.61       # measured 0.6078 on 334 `payment_declined` cases
+CONF_CONTRADICTION = 0.68      # measured 0.6790 on 271 contradicted cases
 CONF_LLM_DEFAULT = 0.70        # used when a model returns an unusable confidence
-CONF_FALLBACK_KEYWORD = 0.55   # keyword heuristic matched something
+CONF_FALLBACK_KEYWORD = 0.63   # measured 0.6281 on 363 keyword-matched cases
 CONF_FALLBACK_NONE = 0.30      # nothing matched -> abstain
 
 # ---------------------------------------------------------------------------
@@ -54,32 +55,61 @@ CONF_FALLBACK_NONE = 0.30      # nothing matched -> abstain
 # ---------------------------------------------------------------------------
 
 CODE_TO_CLASS: dict[str, str] = {
-    # temporary
-    "GW_TIMEOUT": "temporary_failure",
-    "BANK_UNAVAILABLE": "temporary_failure",
-    "UPI_TXN_TIMEOUT": "temporary_failure",
-    "GATEWAY_ERROR": "temporary_failure",
-    # funds
-    "INSUFFICIENT_FUNDS": "insufficient_funds",
-    "NO_BALANCE": "insufficient_funds",
-    "U31": "insufficient_funds",
-    # instrument
-    "CARD_EXPIRED": "invalid_method",
-    "INVALID_VPA": "invalid_method",
-    "ACCOUNT_CLOSED": "invalid_method",
-    "MANDATE_REVOKED": "invalid_method",
-    # auth
-    "OTP_TIMEOUT": "authentication_failure",
-    "3DS_FAILED": "authentication_failure",
-    "PIN_INCORRECT": "authentication_failure",
-    "AUTH_ABANDONED": "authentication_failure",
-    # risk
-    "RISK_DECLINED": "risk_blocked",
-    "FRAUD_SUSPECTED": "risk_blocked",
-    "VELOCITY_LIMIT": "risk_blocked",
-    # repeat
-    "REPEAT_DECLINE": "repeated_failure",
+    # Razorpay's documented payment error reasons.  The taxonomy is shared
+    # across methods where the concept is shared (`insufficient_funds`) and
+    # method-specific where it is not (`invalid_vpa` is UPI-only, `incorrect_cvv`
+    # is cards-only), so one flat lookup is correct here even though the
+    # GENERATOR must emit them per method.
+    #
+    #   https://razorpay.com/docs/errors/payments/upi/
+    #   https://razorpay.com/docs/errors/payments/cards/
+
+    # -- transient: bank, PSP or gateway infrastructure ----------------------
+    "bank_technical_error": "temporary_failure",
+    "gateway_technical_error": "temporary_failure",
+    "payment_timed_out": "temporary_failure",
+    "credit_failed": "temporary_failure",
+
+    # -- balance-side --------------------------------------------------------
+    "insufficient_funds": "insufficient_funds",
+    "transaction_limit_exceeded": "insufficient_funds",
+
+    # -- instrument ----------------------------------------------------------
+    "invalid_vpa": "invalid_method",
+    "vpa_resolution_failed": "invalid_method",
+    "card_expired": "invalid_method",
+    "card_not_enrolled": "invalid_method",
+    "card_disabled_for_online_payments": "invalid_method",
+    "debit_instrument_inactive": "invalid_method",
+    "debit_instrument_blocked": "invalid_method",
+
+    # -- authentication ------------------------------------------------------
+    "authentication_failed": "authentication_failure",
+    "incorrect_cvv": "authentication_failure",
+    "payment_cancelled": "authentication_failure",
+    "payment_collect_request_expired": "authentication_failure",
+
+    # -- risk ----------------------------------------------------------------
+    "payment_risk_check_failed": "risk_blocked",
+    "payment_declined": "risk_blocked",
+
+    # NOTE: there is deliberately no `repeated_failure` entry.  No gateway emits
+    # a "this is the Nth consecutive failure" reason -- it reports the proximate
+    # symptom every time.  That class is reachable only from customer history,
+    # which is what the contradiction rule below reads.  The previous invented
+    # `REPEAT_DECLINE` code made it trivially readable and does not exist.
 }
+
+# Real codes that are mapped but genuinely LOW-INFORMATION.  `payment_declined`
+# is UPI's only signal for a risk block -- UPI's published taxonomy has no
+# dedicated risk reason -- but the same bare "declined" is also what a bank
+# returns for causes that DO have their own codes.  Mapping it to the modal
+# cause is right; doing so at full confidence is not.
+GENERIC_CODES = frozenset({"payment_declined"})
+
+# `payment_failed` is Razorpay's documented catch-all for a general bank decline.
+# It is deliberately ABSENT from CODE_TO_CLASS: it carries no diagnostic content
+# at all, so it must route to the LLM path rather than resolve to a class.
 
 # Threshold at which a prior-failure history overrides a clean gateway code.
 CONTRADICTION_PRIOR_FAILURES = 4
@@ -360,39 +390,51 @@ def diagnose_rules(case: dict[str, Any]) -> Diagnosis | None:
         return None
 
     signals = [f"gateway code {code}"]
-    conf = CONF_MAPPED_CODE
+    if code in GENERIC_CODES:
+        # A real code, but one the gateway uses when it has nothing specific to
+        # say. Resolve it to the modal cause and say so, at reduced confidence.
+        conf = CONF_GENERIC_CODE
+        signals.append("generic decline reason; modal cause assumed")
+    else:
+        conf = CONF_MAPPED_CODE
 
     # Contradictory-signal downgrade.
     #
     # A gateway reports the PROXIMATE symptom. A card that has failed five times
-    # running still returns INSUFFICIENT_FUNDS on the sixth attempt: the code is
+    # running still returns `insufficient_funds` on the sixth attempt: the code is
     # accurate, and the diagnosis it implies may still be the wrong thing to act
     # on.
     #
-    # We first implemented this as a CLASS OVERRIDE to `repeated_failure`, as is
-    # the obvious reading. Measured on the training split, that override fired on
-    # 192 cases and was right 44.8% of the time, against 55.2% for simply
-    # trusting the code -- it cost 0.6 points of overall accuracy. So it does not
-    # ship as an override.
+    # This rule was measured twice, and the second measurement REVERSED the
+    # first. The history is worth keeping, because the reversal is caused by the
+    # taxonomy becoming real rather than by anything about the agent.
     #
-    # What ships is the calibrated response to genuinely conflicting evidence:
-    # keep the marginally-better class, drop confidence to the measured 0.55, and
-    # record BOTH signals so the conflict is visible in the audit trail.
+    #   Under the earlier INVENTED code set, `repeated_failure` had a code of its
+    #   own (`REPEAT_DECLINE`). A symptom code therefore usually meant the
+    #   symptom. Overriding to `repeated_failure` fired on 192 training cases and
+    #   was right 44.8% of the time against 55.2% for trusting the code, so the
+    #   override did not ship.
     #
-    # The action consequence -- that retrying a chronically-failing instrument is
-    # pointless -- is not lost. It is handled in L2, where the uplift table is
-    # keyed by customer segment and `fragile` already captures this history.
-    # Pushing it into the diagnosis class would conflate "what went wrong" with
-    # "what would help", which is exactly the separation L1 and L2 exist to keep.
+    #   Under the real Razorpay taxonomy no gateway emits a repeat reason at all
+    #   (A6), so a chronically-failing instrument ALWAYS wears a symptom code.
+    #   Re-measured on the training split: the override now fires on 265 cases
+    #   and is right 69.4%, against 30.6% for trusting the code. Sweeping the
+    #   threshold, 4 prior failures is the best cut of 3/4/5/6/7.
+    #
+    # So the override ships now, at its measured confidence, and both signals are
+    # still recorded so the conflict stays visible in the audit trail.
+    #
+    # The L1/L2 separation is unchanged: this says only "what went wrong", and
+    # the action consequence is still carried by the `fragile` segment in L2.
     pf = int(case.get("prior_failures", 0))
     if pf >= CONTRADICTION_PRIOR_FAILURES and cls != "repeated_failure":
         return Diagnosis(
-            failure_class=cls,
+            failure_class="repeated_failure",
             confidence=CONF_CONTRADICTION,
             signals=[
                 f"gateway code {code} implies {cls}",
                 f"{pf} prior failures on this instrument contradicts it",
-                "confidence downgraded; treated as chronic in uplift scoring",
+                "reclassified chronic; gateway reports the symptom, not the cause",
             ],
             path="rules",
         )

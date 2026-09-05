@@ -52,7 +52,7 @@ def mkplan(**over):
 
 
 def mkdiag():
-    return Diagnosis("temporary_failure", 0.93, ["gateway code GW_TIMEOUT"], "rules")
+    return Diagnosis("temporary_failure", 0.93, ["gateway code bank_technical_error"], "rules")
 
 
 def run(eng, executor, plan, case=None, budget=100, respect=True, annoy=40.0):
