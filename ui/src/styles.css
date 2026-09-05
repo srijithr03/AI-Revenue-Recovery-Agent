@@ -621,3 +621,14 @@ a:focus-visible, button:focus-visible, tr:focus-visible, select:focus-visible, t
   color: var(--text);
   border-top: 1px solid var(--border);
 }
+
+/* Chart hover readout. Full precision on purpose -- hovering is how a reader
+   takes a number off a chart, and a rounded one just sends them to the table. */
+.chart-tip { background: var(--surface); border: 1px solid var(--border);
+             border-radius: 6px; padding: 10px 12px; font-size: 12px;
+             box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.chart-tip-head { font-size: 11px; color: var(--text-muted); margin-bottom: 8px;
+                  padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.chart-tip-row { display: flex; justify-content: space-between; gap: 20px; padding: 2px 0; }
+.chart-tip-foot { font-size: 11px; color: var(--text-muted); margin-top: 8px;
+                  padding-top: 6px; border-top: 1px solid var(--border); }

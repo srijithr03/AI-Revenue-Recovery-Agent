@@ -1,11 +1,13 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Bar, BarChart, CartesianGrid, Cell, LabelList, Legend, ReferenceLine,
-  ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis,
+  Bar, BarChart, CartesianGrid, Cell, LabelList, Legend, Line, LineChart,
+  ReferenceLine, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis,
+  YAxis, ZAxis,
 } from 'recharts';
 import {
-  CLASS_LABEL, count, duration, interval, intervalRaw, money, moneySigned, pct, prob,
+  CLASS_LABEL, count, duration, interval, intervalRaw, money, moneyExact,
+  moneySigned, pct, prob,
 } from '../lib/format.js';
 import { Section } from '../components/common.jsx';
 
@@ -15,6 +17,50 @@ import { Section } from '../components/common.jsx';
 const C_AGENT = '#1a1a18';
 const C_NAIVE = '#6b6a65';
 const C_CONTROL = '#b9b8b3';
+
+/* Hover readout for the sweep charts.
+ *
+ * The charts make the crossover legible at a glance; the tables under them stay
+ * because a reader judging exactly WHERE it sits needs the figures. So this
+ * carries full precision rather than the rounded axis value -- hovering is how
+ * you read a number off a chart, and a rounded one just sends you back to the
+ * table. */
+function SweepTip({ active, payload, label, unit, delta }) {
+  if (!active || !payload || !payload.length) return null;
+  const row = payload[0].payload;
+  return (
+    <div className="chart-tip">
+      <div className="chart-tip-head mono">{unit(label)}</div>
+      {payload.map((e) => (
+        <div className="chart-tip-row" key={e.dataKey}>
+          <span style={{ color: e.color }}>{e.name}</span>
+          <span className="mono">{moneyExact(e.value)}</span>
+        </div>
+      ))}
+      {delta && row.agent != null && row.naive != null && (
+        <div className="chart-tip-foot mono">
+          agent − naive {moneySigned(row.agent - row.naive)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ArmTip({ active, payload }) {
+  if (!active || !payload || !payload.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="chart-tip">
+      <div className="chart-tip-head mono">{d.arm}</div>
+      <div className="chart-tip-row">
+        <span>net / case</span><span className="mono">{moneyExact(d.net)}</span>
+      </div>
+      <div className="chart-tip-row">
+        <span>contacts</span><span className="mono">{count(d.contacts)}</span>
+      </div>
+    </div>
+  );
+}
 
 export default function Evaluation({ summary }) {
   const p = summary.comparison_paired;
@@ -27,6 +73,27 @@ export default function Evaluation({ summary }) {
     { arm: 'naive', net: arms.naive.net_per_case, contacts: arms.naive.contacts, fill: C_NAIVE },
     { arm: 'agent', net: arms.agent.net_per_case, contacts: arms.agent.contacts, fill: C_AGENT },
   ];
+
+  /* Sweep chart data. Read straight off the artifact; the crossover marker is
+     the first swept point the harness flagged as a win, not a value computed
+     here. */
+  const annoyChart = summary.sensitivity_annoyance.map((r) => ({
+    cost: r.annoyance_cost,
+    control: r.control_net_per_case,
+    naive: r.naive_net_per_case,
+    agent: r.agent_net_per_case,
+  }));
+  const crossover = (summary.sensitivity_annoyance.find((r) => r.agent_wins) || {})
+    .annoyance_cost ?? null;
+
+  const budgetChart = summary.sensitivity_budget.map((r) => ({
+    budget: r.budget_per_1000,
+    agent: r.agent_net_per_case,
+    naive: r.naive_net_per_case,
+  }));
+  const budgetCross = (summary.sensitivity_budget.find((r) => r.agent_wins) || {})
+    .budget_per_1000 ?? null;
+
 
   const classRows = Object.entries(summary.recovery_by_class).map(([cls, row]) => ({
     cls: CLASS_LABEL[cls] || cls,
@@ -100,6 +167,7 @@ export default function Evaluation({ summary }) {
                 <YAxis type="category" dataKey="arm" width={60}
                   tick={{ fontSize: 12, fill: C_NAIVE, fontFamily: 'JetBrains Mono, monospace' }}
                   axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} content={<ArmTip />} />
                 <Bar dataKey="net" barSize={20} isAnimationActive={false}>
                   {armChart.map((e, i) => <Cell key={i} fill={e.fill} />)}
                   <LabelList dataKey="net" position="right"
@@ -117,6 +185,7 @@ export default function Evaluation({ summary }) {
                 <YAxis type="category" dataKey="arm" width={60}
                   tick={{ fontSize: 12, fill: C_NAIVE, fontFamily: 'JetBrains Mono, monospace' }}
                   axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} content={<ArmTip />} />
                 <Bar dataKey="contacts" barSize={20} isAnimationActive={false}>
                   {armChart.map((e, i) => <Cell key={i} fill={e.fill} />)}
                   <LabelList dataKey="contacts" position="right"
@@ -210,12 +279,45 @@ export default function Evaluation({ summary }) {
         </div>
       </Section>
 
-      {/* A table, not a chart. The reader needs exact numbers to judge where
-          the crossover sits. */}
+      {/* Chart AND table. The chart makes the crossover legible in one look,
+          which is the most explanatory moment in the project; the table stays
+          because judging exactly where it sits needs the figures. */}
       <Section
         title="Sensitivity — annoyance cost per contact"
-        note="The most load-bearing assumption in the project, and one with no published value. Swept rather than defended. Note that the naive arm sends the same number of contacts at every price."
+        note="The most load-bearing assumption in the project, and one with no published value. Swept rather than defended. The naive arm sends the same number of contacts at every price — so as contact gets expensive it keeps paying and the agent does not."
       >
+        <div className="chart-wrap" style={{ marginBottom: 20 }}>
+          <div className="chart-legend">
+            net value per case as a contact gets more expensive — hover any point
+          </div>
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={annoyChart} margin={{ top: 12, right: 24, bottom: 28, left: 8 }}>
+              <CartesianGrid stroke="#e3e2dd" strokeDasharray="2 3" vertical={false} />
+              <XAxis dataKey="cost" type="number" domain={['dataMin', 'dataMax']}
+                ticks={annoyChart.map((d) => d.cost)} tickFormatter={(v) => `₹${v}`}
+                tick={{ fontSize: 11, fill: C_NAIVE, fontFamily: 'JetBrains Mono, monospace' }}
+                label={{ value: 'annoyance cost per contact', position: 'insideBottom',
+                         offset: -16, style: { fontSize: 11, fill: C_NAIVE } }} />
+              <YAxis tickFormatter={(v) => money(v)} width={76}
+                tick={{ fontSize: 11, fill: C_NAIVE, fontFamily: 'JetBrains Mono, monospace' }} />
+              {crossover != null && (
+                <ReferenceLine x={crossover} stroke={C_AGENT} strokeDasharray="3 3"
+                  label={{ value: 'agent overtakes', position: 'top',
+                           style: { fontSize: 11, fill: C_AGENT } }} />
+              )}
+              <Tooltip content={<SweepTip unit={(v) => `₹${v} per contact`} delta />} />
+              <Line type="monotone" dataKey="control" name="control" stroke={C_CONTROL}
+                strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+              <Line type="monotone" dataKey="naive" name="naive" stroke={C_NAIVE}
+                strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+              <Line type="monotone" dataKey="agent" name="agent" stroke={C_AGENT}
+                strokeWidth={2} dot={{ r: 4 }} isAnimationActive={false} />
+            </LineChart>
+          </ResponsiveContainer>
+          <div className="chart-legend" style={{ marginTop: 6 }}>
+            agent solid black · naive grey · control light grey
+          </div>
+        </div>
         <div className="table-wrap">
           <table className="table-plain">
             <thead>
@@ -271,6 +373,38 @@ export default function Evaluation({ summary }) {
         title="Sensitivity — contact budget"
         note="The agent is constrained to 150 contacts per 1,000 cases; the naive arm is not constrained at all. This separates 'the targeting is no good' from 'it is fighting with one hand tied'."
       >
+        <div className="chart-wrap" style={{ marginBottom: 20 }}>
+          <div className="chart-legend">
+            net value per case as the agent is allowed more contacts — the naive
+            line is flat because it has no budget concept
+          </div>
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={budgetChart} margin={{ top: 12, right: 24, bottom: 28, left: 8 }}>
+              <CartesianGrid stroke="#e3e2dd" strokeDasharray="2 3" vertical={false} />
+              <XAxis dataKey="budget" type="number" scale="log" domain={['dataMin', 'dataMax']}
+                ticks={budgetChart.map((d) => d.budget)} tickFormatter={(v) => count(v)}
+                tick={{ fontSize: 11, fill: C_NAIVE, fontFamily: 'JetBrains Mono, monospace' }}
+                label={{ value: 'contact budget per 1,000 cases (log scale)',
+                         position: 'insideBottom', offset: -16,
+                         style: { fontSize: 11, fill: C_NAIVE } }} />
+              <YAxis tickFormatter={(v) => money(v)} width={76}
+                tick={{ fontSize: 11, fill: C_NAIVE, fontFamily: 'JetBrains Mono, monospace' }} />
+              {budgetCross != null && (
+                <ReferenceLine x={budgetCross} stroke={C_AGENT} strokeDasharray="3 3"
+                  label={{ value: 'agent overtakes', position: 'top',
+                           style: { fontSize: 11, fill: C_AGENT } }} />
+              )}
+              <Tooltip content={<SweepTip unit={(v) => `${count(v)} contacts per 1,000`} delta />} />
+              <Line type="monotone" dataKey="naive" name="naive" stroke={C_NAIVE}
+                strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+              <Line type="monotone" dataKey="agent" name="agent" stroke={C_AGENT}
+                strokeWidth={2} dot={{ r: 4 }} isAnimationActive={false} />
+            </LineChart>
+          </ResponsiveContainer>
+          <div className="chart-legend" style={{ marginTop: 6 }}>
+            agent solid black · naive grey
+          </div>
+        </div>
         <div className="table-wrap">
           <table className="table-plain">
             <thead>
