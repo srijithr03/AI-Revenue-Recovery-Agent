@@ -294,9 +294,22 @@ been zero.
 **Honest accounting.** Fixing this makes the world *coherent*; it does not make
 it easier in the sense that matters, because no signal is added and nothing that
 was genuinely ambiguous becomes clear. But it does raise measured diagnosis
-accuracy — roughly 2 of the ~8 points gained in that iteration — so it is
-reported as a world fix rather than an agent improvement. It also lowers the
-realised `repeated_failure` share from 16.2% to 10.2%, closer to the A2 prior.
+accuracy, and the split was measured rather than estimated by running the
+*previous* diagnosis layer against the *current* world:
+
+| | accuracy | attributable to |
+|---|---:|---|
+| old agent, old world | 0.7619 | — |
+| old agent, **new world** | 0.8098 | **this fix alone: +4.79 points** |
+| new agent, new world | 0.8403 | agent changes alone: +3.05 points |
+
+So **the majority of the gain came from the world, not the agent** — 4.79 points
+against 3.05. An earlier draft of this file estimated this fix at "roughly 2 of
+the ~8 points" without measuring it; that was wrong in the direction that
+flattered the agent, and the measured figure replaces it.
+
+It also lowers the realised `repeated_failure` share from 16.2% to 10.2%, closer
+to the A2 prior.
 
 **Direction of effect on the headline:** negative for the agent. Agent-vs-naive
 moved from -Rs 43.57 to -Rs 65.56 across this change and the diagnosis work

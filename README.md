@@ -260,7 +260,21 @@ agent could reach.
 The generator now forbids that. This makes the world **coherent**, not easier in
 the sense that matters — no signal is added and nothing genuinely ambiguous
 becomes clear — but it does raise measured accuracy, so it is reported as a world
-fix and not as an agent improvement. Two of the ~8 points came from here.
+fix and not as an agent improvement.
+
+**How much of the gain was the world and how much was the agent?** Measured, by
+running the previous diagnosis layer against the current world:
+
+| | accuracy | attributable to |
+|---|---:|---|
+| old agent, old world | 0.7619 | — |
+| old agent, **new world** | 0.8098 | **world fix alone: +4.79 points** |
+| new agent, new world | 0.8403 | agent changes alone: +3.05 points |
+
+**The majority of the improvement came from fixing the world, not from improving
+the agent.** In the same held-fixed world the agent changes are worth **+₹2.68
+per case** — real, positive, and negligible against a ₹1,142 base, which is the
+same verdict the oracle ablation reaches from the other direction.
 
 ---
 
