@@ -2,254 +2,295 @@
 
 **AI Revenue Recovery Agent · Razorpay AI Buildathon 2026 · Track 03**
 
-Narration is word-for-word. **ON SCREEN** tells you what to show and when.
+## How to use this document
 
-Written to be **spoken, not read**. Short sentences, one idea each. All the
-technical terms are still here — uplift, control arm, expected value, policy
-rule, calibration, LLM — but each one is explained the first time you say it.
+Each beat has two parts:
 
-**765 words. That is about 5:05 at a normal speaking pace.**
+- **SCREEN** — exactly what to do in the browser. Do this *first*, then speak.
+- **SAY** — read this out, word for word.
 
-Average sentence is 6 words. Nothing is longer than 18. That is deliberate —
-short sentences are much easier to deliver naturally on camera.
+Every technical term is kept, and each is explained the first time you say it.
+Sentences are short on purpose: they are easier to deliver on camera, and they
+give you natural places to pause.
 
-Three rules while recording:
+**767 words — about 5:05 at a normal speaking pace.**
 
-- **Run it live.** Do not talk over screenshots. The terminal and the chart
-  hover are the two things a fake demo cannot do.
-- **Say the full numbers.** "Two nineteen eighty-one", not "around two twenty".
-- **Say the bad number in a normal voice.** Do not apologise for it. It is the
-  strongest part of this submission, not the weakest.
+If you are under a hard five-minute limit, take the first cut in the list at the
+end (the `/case/REC-11462` shot at 1:30). That removes roughly fifteen seconds
+and brings you to about **4:50**. Do not speed up to fit — the numbers are the
+point, and rushing them costs more than dropping one shot.
 
-Before recording: `python run.py serve` in terminal one, `cd ui && npm run dev`
-in terminal two, browser on `localhost:5173`, and a third terminal empty and
-ready.
+### Before you start recording
 
----
+1. Terminal one: `python run.py serve`
+2. Terminal two: `cd ui && npm run dev`
+3. Browser: open `http://localhost:5173/explainer` and leave it at the top
+4. Open these four tabs in advance, so you never wait for a page to load:
+   `/case/REC-11462` · `/case/REC-1621` · `/case/REC-4397` · `/evaluation`
 
-## 0:00 – 0:12 · Greeting
+### Three rules
 
-> **ON SCREEN** — `/explainer`, already loaded. Camera or voice only, both fine.
-> Keep it short. This is the only part that is not evidence.
-
-Hi, I'm **Srijith**. This is my submission for **Track 3 of the Razorpay AI
-Buildathon** — the **AI Revenue Recovery Agent**.
-
-> **Change this if needed:** submitting as a team? Say "we" and name the team.
+- **Read the full numbers.** Say "two nineteen eighty-one", not "around two twenty".
+- **Say the unfavourable number in a normal voice.** Do not apologise for it. It
+  is the strongest part of this submission.
+- **Pause between sentences.** The numbers need a moment to land.
 
 ---
 
-## 0:12 – 0:38 · The problem, and my answer
+# 0:00 – 0:12 · Greeting
 
-> **ON SCREEN** — stay on the hero. Do not scroll yet.
+**SCREEN** — The `/explainer` page, at the top. Nothing to click.
 
-A failed payment is not always lost money.
+**SAY:**
 
-Some customers pay again on their own. Some pay only if you contact them. Some
-never pay at all.
+> Hello. I'm **Srijith**, and this is my submission for **Track 3 of the Razorpay
+> AI Buildathon** — the **AI Revenue Recovery Agent**.
 
-So retrying is not the hard part. The hard part is knowing which is which. When
-a payment succeeds after you act, you cannot tell if you caused it.
-
-Here is my result first. Against doing nothing, my agent earns **₹219.81 more
-per payment**. Against a normal retry bot, it earns **₹65.56 less**.
+*(Submitting as a team? Say "we", and name the team here.)*
 
 ---
 
-## 0:38 – 1:02 · Proof that it runs
+# 0:12 – 0:42 · The problem, and the result
 
-> **ON SCREEN** — cut to terminal. Type it live. Let it scroll. Cut at ~1:02.
+**SCREEN** — Stay on the same page. Do not scroll yet.
 
-```bash
-python run.py all
-```
+**SAY:**
 
-One command runs everything. It creates sixteen thousand test payments. It
-checks the test data is hard enough. It runs a hundred and forty tests. Then it
-compares three strategies on twelve thousand payments.
-
-It takes **296 seconds**. Every number I show you comes from this command.
-
----
-
-## 1:02 – 1:58 · The main idea, and one decision
-
-> **ON SCREEN** — `/explainer` §02. Press **Apply the action** as you talk.
-
-The main idea is called **uplift**.
-
-Take one failed payment. If I do nothing, it recovers **27.7%** of the time. If I
-act, it recovers **39.6%** of the time.
-
-The difference is **11.8%**. That is uplift. That is the only part my action
-created. The rest was going to happen without me.
-
-> **ON SCREEN** — scroll to §05, "The agent says no".
-
-Now watch this case. `REC-11462`.
-
-Sending an SMS was worth **₹408.98**. A free retry was worth **₹220.81**. So the
-SMS looks better.
-
-The agent said no. Here is why.
-
-The retry is free. The SMS uses one customer contact. So the SMS only adds
-**₹188.17** of extra value on top.
-
-I only have **1,800** contacts for the whole batch. This case ranked **1,801**.
-It missed by one place. The cutoff was ₹188.21. **It missed by four paise.**
-
-> **ON SCREEN** — click through to `/case/REC-11462`.
-
-Same case in the console. The reason is a calculation, not a label.
+> A failed payment is not always lost revenue.
+>
+> Some customers pay again on their own. Some pay only if you contact them. Some
+> never pay at all.
+>
+> So retrying is not the difficult part. Telling those three groups apart is. When
+> a payment succeeds after you act, you cannot tell whether you caused it.
+>
+> The result first. Against doing nothing, this agent earns **₹219.81 more per
+> payment**. Against a standard retry bot, it earns **₹65.56 less**. I will show
+> you both.
 
 ---
 
-## 1:58 – 2:38 · Money it refused to chase
+# 0:42 – 1:40 · Uplift, and one decision
 
-> **ON SCREEN** — `/case/REC-1621`, then `/` overview.
+**SCREEN 1** — Scroll down to the section headed **"Uplift is the only thing
+worth paying for"**. Click the button labelled **"Apply the action"** as you begin
+speaking. The green bar will extend.
 
-Any system can spend money. This one refuses.
+**SAY:**
 
-`REC-1621` is a **₹1,20,000** payment. The agent found an action worth
-**₹16,863**. That is the biggest opportunity in the whole batch. It did not act.
+> The core idea is **uplift**.
+>
+> Take one failed payment. If I do nothing, it recovers **27.7 percent** of the
+> time. If I act, **39.6 percent**.
+>
+> The difference is **11.8 percent**. That is uplift — the only portion my action
+> created. The rest would have arrived without me.
 
-Why? The payment was more than 72 hours old. Policy rule **R7** blocked every
-action.
+**SCREEN 2** — Scroll down to the section headed **"Sometimes the best recovery
+action is no action"**. The three panels should be fully visible.
 
-Across the batch it skipped **3,475** payments, worth **₹1.26 crore**.
+**SAY:**
 
-Was that correct? Of the money it skipped, only **4.9%** came back on its own.
-Across all payments, **20.2%** came back. So it skipped the right ones.
+> Now a decision worth examining. Case `REC-11462`.
+>
+> An SMS was valued at **₹408.98**. A free retry at **₹220.81**. On value alone,
+> the SMS is the better action.
+>
+> The agent declined it. Here is why.
+>
+> The retry costs nothing. The SMS consumes one customer contact. So the SMS only
+> adds **₹188.17** on top of the retry.
+>
+> I have **1,800** contacts for the entire batch. This case ranked **1,801**. It
+> missed by a single place. The cutoff was ₹188.21. **It missed by four paise.**
 
----
+**SCREEN 3** — Switch to the `/case/REC-11462` tab. Scroll to the table headed
+**"Alternatives considered"**.
 
-## 2:38 – 3:08 · Stopping, failing safely, and rules
+**SAY:**
 
-> **ON SCREEN** — `/case/REC-16014`, `/case/REC-3980`, then `/evaluation`
-> "Policy and stopping". About ten seconds each.
-
-Three quick things.
-
-**Stopping.** `REC-16014` retried three times. All three failed. It stopped, and
-it logged the reason.
-
-**Failure handling.** `REC-3980` had no error code, only text. I had no API key
-in this run, so the **LLM could not run**. The system used a keyword rule, then
-customer history. Neither was enough. So it answered **unknown**, at **0.30
-confidence**. It did not guess, and it did not crash.
-
-**Rules.** **70,864** policy checks. **Zero** violations.
-
----
-
-## 3:08 – 3:40 · A mistake it made
-
-> **ON SCREEN** — `/case/REC-4397`.
-
-Now a mistake. I would rather show you myself.
-
-`REC-4397` is a **₹70,000** payment. The gateway said insufficient funds. My
-system believed it, at **94% confidence**. That was wrong. The real cause was
-repeated failure. Retrying was never going to work.
-
-My **calibration** chart shows how often this happens at each confidence level.
-
-One thing did work. ₹70,000 is above my high-value limit. So this case went to a
-human for approval, instead of running automatically.
+> Here is the same case in the operations console. The rejection reason is a
+> calculation, not a label.
 
 ---
 
-## 3:40 – 4:32 · The results, honestly
+# 1:40 – 2:20 · Revenue it declined to pursue
 
-> **ON SCREEN** — `/evaluation`, three-arm section.
+**SCREEN 1** — Switch to the `/case/REC-1621` tab. The stop reason is near the
+top of the page.
 
-Three strategies. Twelve thousand payments. Every payment goes through all three,
-so the comparison is fair.
+**SAY:**
 
-**Control** does nothing at all. It still earns **₹922** per payment. A normal
-retry bot takes credit for that money.
+> Any system can spend money. This one declines to.
+>
+> `REC-1621` is a **₹1,20,000** payment. The agent valued a human escalation on it
+> at **₹16,863**. That is the largest single opportunity in the batch. It did not
+> act.
+>
+> The payment had aged past seventy-two hours. Policy rule **R7** refused every
+> available action.
 
-My agent adds **₹219.81** on top of that. The naive bot adds **₹285**. So the
-naive bot wins on total value. I am not hiding that.
+**SCREEN 2** — Go to `/`, the run overview. Scroll to the section headed
+**"Revenue deliberately not pursued"**.
 
-> **ON SCREEN** — scroll to the annoyance chart. **Hover the ₹150 point.**
+**SAY:**
 
-But look at the cost. My agent used **1,800** customer contacts. The naive bot
-used **11,553**.
-
-Per contact, my agent earns **₹1,465**. The naive bot earns **₹296**.
-
-Now the important part. This chart shows what happens when contacting a customer
-gets expensive. At about **₹150** per contact, the naive bot collapses, and my
-agent overtakes it.
-
-That cost is an assumption. So I tested it from ₹0 to ₹900.
-
----
-
-## 4:32 – 4:58 · Where the AI is allowed to work
-
-> **ON SCREEN** — `/explainer` §07, the two columns.
-
-One design decision.
-
-The **LLM** reads unclear error messages. It suggests a cause. It gives a
-confidence score. It is allowed to say it does not know.
-
-That is all it does.
-
-It never calculates money. It never approves an action. It never changes a retry
-counter. It never calls a payment API. Every LLM answer is checked against a
-fixed list first.
-
-The LLM suggests. Normal code decides. Tests enforce that.
+> Across the batch it declined **3,475** payments, worth **₹1.26 crore**.
+>
+> Was that correct? Of the revenue it skipped, only **4.9 percent** returned on its
+> own. Across all payments, **20.2 percent** returned. It skipped the right ones.
 
 ---
 
-## 4:58 – 5:18 · Close
+# 2:20 – 2:55 · Stopping, degrading, and compliance
 
-> **ON SCREEN** — `/evaluation`, Limitations. Hold to the end.
+**SCREEN 1** — Go to `/case/REC-16014`. Show the stop reason. *(About 8 seconds.)*
 
-My limitations, honestly.
+**SAY:**
 
-The data is synthetic. The execution is simulated. The contact cost is an
-assumption, and my result depends on it.
+> Three properties the system has to demonstrate.
+>
+> **Stopping.** `REC-16014` retried three times and failed three times. It stopped,
+> and it recorded the reason.
 
-And in all **ten** alternative test worlds, the naive bot won on total value.
-What held in all ten was efficiency per contact.
+**SCREEN 2** — Go to `/case/REC-3980`. Show the decision trace, where the
+diagnosis path and confidence are visible. *(About 12 seconds.)*
 
-Seed **8675309**. One command reproduces everything. Please check it.
+**SAY:**
+
+> **Graceful degradation.** `REC-3980` arrived with no error code, only free text.
+> There was no API key in this run, so the **LLM** could not be called. The system
+> fell back to a keyword rule, then to customer history. Neither was sufficient. So
+> it returned **unknown**, at **0.30 confidence**. It did not guess, and it did not
+> stop the batch.
+
+**SCREEN 3** — Go to `/evaluation`. Scroll to **"Policy and stopping"**.
+
+**SAY:**
+
+> **Compliance.** **70,864** policy rule evaluations. **Zero** violations.
 
 ---
 
-## Shot list
+# 2:55 – 3:30 · A case it got wrong
 
-| # | Screen | What must be visible |
+**SCREEN** — Switch to the `/case/REC-4397` tab. The decision trace shows the
+confidence and the diagnosis.
+
+**SAY:**
+
+> Now a case the system got wrong. I would rather show you than have you find it.
+>
+> `REC-4397` is a **₹70,000** payment. The gateway reported insufficient funds, and
+> the diagnosis layer accepted that at **94 percent confidence**. It was wrong. The
+> true cause was a repeated failure. Retrying was never going to succeed.
+>
+> The **calibration** chart reports how often that happens at each confidence level.
+>
+> One thing did work. ₹70,000 exceeds the high-value threshold, so the case was
+> routed to a human rather than executed automatically.
+
+---
+
+# 3:30 – 4:25 · The results
+
+**SCREEN 1** — Switch to the `/evaluation` tab. Scroll to **"Three arms"** so the
+comparison table is fully visible.
+
+**SAY:**
+
+> Three strategies, twelve thousand held-out payments. Every payment runs through
+> all three, so the comparison is like for like.
+>
+> The **control arm** takes no action at all, and still returns **₹922** per
+> payment. A standard retry bot quietly takes credit for that revenue.
+>
+> This agent adds **₹219.81** on top of it. The naive retry bot adds **₹285**. The
+> naive bot wins on total value, and I am not hiding that.
+
+**SCREEN 2** — Scroll to the chart headed **"Sensitivity — annoyance cost per
+contact"**. **Hover your cursor over the ₹150 point** so the readout box appears,
+and leave it there while you speak.
+
+**SAY:**
+
+> But consider the cost. This agent used **1,800** customer contacts. The naive bot
+> used **11,553**.
+>
+> Per contact, this agent returns **₹1,465**. The naive bot returns **₹296**.
+>
+> Now the important part. This chart shows what happens as customer contact becomes
+> more expensive. At roughly **₹150** per contact, the naive strategy collapses and
+> the agent overtakes it.
+>
+> That cost is an assumption, so I swept it from ₹0 to ₹900 rather than defend a
+> single value.
+
+---
+
+# 4:25 – 4:50 · Where the AI is permitted to act
+
+**SCREEN** — Go back to `/explainer`. Scroll to the section headed **"The LLM
+proposes. Deterministic code decides."** Both columns should be visible.
+
+**SAY:**
+
+> One architectural decision.
+>
+> The **LLM** reads ambiguous gateway messages. It proposes a failure class. It
+> attaches a confidence score. It is permitted to abstain.
+>
+> That is the full extent of its authority.
+>
+> It calculates no financial figure. It approves no action. It cannot alter a retry
+> counter or call a payment API. Every proposal is validated against a fixed list
+> first.
+>
+> The LLM proposes. Deterministic code decides. Tests enforce that boundary.
+
+---
+
+# 4:50 – 5:00 · Close
+
+**SCREEN** — Go to `/`, the run overview, so the header showing **seed 8675309**
+and **batch duration 296.99s** is visible. Hold this shot until the end.
+
+**SAY:**
+
+> Finally, the limitations. The data is synthetic. Execution is simulated. The
+> contact cost is an assumption the headline depends on.
+>
+> This batch runs from one seed in 296 seconds. One command reproduces every number
+> I have shown. Please check it.
+
+---
+
+## Screen checklist
+
+| Time | Screen | What must be visible |
 |---|---|---|
-| 1 | `/explainer` hero | greeting, then the headline |
-| 2 | terminal | `python run.py all` running live |
-| 3 | `/explainer` §02 | uplift bars **after** the button press |
-| 4 | `/explainer` §05 | ₹188.17 vs ₹188.21 · rank 1,801 of 4,671 |
-| 5 | `/case/REC-11462` | the calculated rejection reason |
-| 6 | `/case/REC-1621` | `forgoes human_escalation at incremental EV 16863.07` |
-| 7 | `/` overview | "Revenue deliberately not pursued" |
-| 8 | `/case/REC-16014` | `maximum attempts reached (3)` |
-| 9 | `/case/REC-3980` | `fallback_none` · 0.30 confidence · no-key reason |
-| 10 | `/case/REC-4397` | 0.940 confidence · wrong class · escalated |
-| 11 | `/evaluation` | three-arm table |
-| 12 | `/evaluation` | annoyance chart **with the hover box open** |
-| 13 | `/explainer` §07 | the two columns |
-| 14 | `/evaluation` | Limitations |
+| 0:00 | `/explainer` top | Title and headline |
+| 0:42 | `/explainer` — "Uplift is the only thing worth paying for" | Green bar **after** clicking "Apply the action" |
+| 1:05 | `/explainer` — "Sometimes the best recovery action is no action" | ₹188.17 against ₹188.21 · rank 1,801 of 4,671 |
+| 1:30 | `/case/REC-11462` | "Alternatives considered" table |
+| 1:40 | `/case/REC-1621` | `forgoes human_escalation at incremental EV 16863.07` |
+| 2:05 | `/` overview | "Revenue deliberately not pursued" |
+| 2:20 | `/case/REC-16014` | `maximum attempts reached (3)` |
+| 2:30 | `/case/REC-3980` | Diagnosis path and 0.30 confidence |
+| 2:50 | `/evaluation` | "Policy and stopping" |
+| 2:55 | `/case/REC-4397` | 0.940 confidence, wrong class, escalated |
+| 3:30 | `/evaluation` | "Three arms" table |
+| 3:55 | `/evaluation` | Annoyance chart **with the hover box open** |
+| 4:25 | `/explainer` | The two LLM boundary columns |
+| 4:50 | `/` overview | Header: seed and batch duration |
 
-## If you run out of time
+## If you run over five minutes
 
 Cut in this order, and no further:
 
-1. The `/case/REC-11462` console shot at 1:58 — §05 already made the point
-2. `REC-16014` at 2:38 — keep the failure handling and the rule count
-3. The uplift bars at 1:02 — painful, but the rejection case carries the idea
+1. The `/case/REC-11462` shot at 1:30 — the explainer panel already made the point
+2. `REC-16014` at 2:20 — keep the degradation case and the rule count
+3. The uplift bars at 0:42 — costly, but the rejection case still carries the idea
 
-**Never cut:** the naive bot winning at 3:40, the ₹150 crossover, or the
-limitations. Those three are why this submission is believable. Cutting them to
-save time makes it an ordinary demo.
+**Never cut:** the naive bot winning at 3:30, the ₹150 crossover, or the
+limitations. Those three are what make this submission credible.
