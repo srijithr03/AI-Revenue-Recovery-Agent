@@ -13,20 +13,21 @@ Every technical term is kept, and each is explained the first time you say it.
 Sentences are short on purpose: they are easier to deliver on camera, and they
 give you natural places to pause.
 
-**767 words — about 5:05 at a normal speaking pace.**
+**791 words — about 5:16 at a normal speaking pace.**
 
-If you are under a hard five-minute limit, take the first cut in the list at the
-end (the `/case/REC-11462` shot at 1:30). That removes roughly fifteen seconds
-and brings you to about **4:50**. Do not speed up to fit — the numbers are the
-point, and rushing them costs more than dropping one shot.
+If you are under a hard five-minute limit, take the first two cuts in the list at
+the end. That removes roughly twenty-five seconds and brings you to about
+**4:50**. Do not speed up to fit — the numbers are the point, and rushing them
+costs more than dropping a shot.
 
 ### Before you start recording
 
 1. Terminal one: `python run.py serve`
 2. Terminal two: `cd ui && npm run dev`
 3. Browser: open `http://localhost:5173/explainer` and leave it at the top
-4. Open these four tabs in advance, so you never wait for a page to load:
-   `/case/REC-11462` · `/case/REC-1621` · `/case/REC-4397` · `/evaluation`
+4. Open these five tabs in advance, so you never wait for a page to load:
+   `/case/REC-11462` · `/case/REC-1621` · `/case/REC-4397` · `/evaluation` ·
+   `/assumptions`
 
 ### Three rules
 
@@ -192,7 +193,7 @@ confidence and the diagnosis.
 
 ---
 
-# 3:30 – 4:25 · The results
+# 3:30 – 4:32 · The results
 
 **SCREEN 1** — Switch to the `/evaluation` tab. Scroll to **"Three arms"** so the
 comparison table is fully visible.
@@ -226,9 +227,18 @@ and leave it there while you speak.
 > That cost is an assumption, so I swept it from ₹0 to ₹900 rather than defend a
 > single value.
 
+**SCREEN 3** — Switch to the **Assumptions** tab. Scroll to the table headed
+**"Summary: which assumptions actually matter"**. Hold for about five seconds on
+the top row, where **A10** is marked **Critical**.
+
+**SAY:**
+
+> Every assumption in this system is documented, and graded by how much damage it
+> does if it is wrong. This one is marked critical.
+
 ---
 
-# 4:25 – 4:50 · Where the AI is permitted to act
+# 4:32 – 4:57 · Where the AI is permitted to act
 
 **SCREEN** — Go back to `/explainer`. Scroll to the section headed **"The LLM
 proposes. Deterministic code decides."** Both columns should be visible.
@@ -250,7 +260,7 @@ proposes. Deterministic code decides."** Both columns should be visible.
 
 ---
 
-# 4:50 – 5:00 · Close
+# 4:57 – 5:07 · Close
 
 **SCREEN** — Go to `/`, the run overview, so the header showing **seed 8675309**
 and **batch duration 296.99s** is visible. Hold this shot until the end.
@@ -281,8 +291,9 @@ and **batch duration 296.99s** is visible. Hold this shot until the end.
 | 2:55 | `/case/REC-4397` | 0.940 confidence, wrong class, escalated |
 | 3:30 | `/evaluation` | "Three arms" table |
 | 3:55 | `/evaluation` | Annoyance chart **with the hover box open** |
-| 4:25 | `/explainer` | The two LLM boundary columns |
-| 4:50 | `/` overview | Header: seed and batch duration |
+| 4:25 | `/assumptions` | "Summary: which assumptions actually matter" — A10 row, marked **Critical** |
+| 4:32 | `/explainer` | The two LLM boundary columns |
+| 4:57 | `/` overview | Header: seed and batch duration |
 
 ## If you run over five minutes
 
@@ -292,5 +303,7 @@ Cut in this order, and no further:
 2. `REC-16014` at 2:20 — keep the degradation case and the rule count
 3. The uplift bars at 0:42 — costly, but the rejection case still carries the idea
 
-**Never cut:** the naive bot winning at 3:30, the ₹150 crossover, or the
-limitations. Those three are what make this submission credible.
+**Never cut:** the naive bot winning at 3:30, the ₹150 crossover, the assumptions
+table, or the limitations. Those four are what make this submission credible. The
+assumptions shot costs five seconds and is the difference between claiming the
+work is documented and showing that it is.
