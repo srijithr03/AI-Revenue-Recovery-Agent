@@ -33,6 +33,7 @@ from eval.calibration import diagnosis_reliability, uplift_reliability
 from eval.harness import (CONTACT_BUDGET_PER_1000, Harness, compare,
                           compare_paired, recovery_by_class, value_band)
 from eval.diagnostics import analyse, build_rows, oracle_ablation
+from eval.explainer import build as build_explainer
 from eval.assumption_sweep import (sweep_base_recovery,
                                    sweep_treatment_strength)
 from eval.sensitivity import sweep_annoyance, sweep_budget
@@ -661,6 +662,9 @@ def main() -> int:
         "sensitivity_budget": bud,
         "sensitivity_natural_recovery": arec,
         "sensitivity_treatment_strength": atre,
+        "explainer": build_explainer(
+            ui_cases, alternatives, pres["agent"].contacts,
+            max(1, round(CONTACT_BUDGET_PER_1000 * len(holdout) / 1000))),
         "funnel": funnel,
         "skipped": {
             "n": len(skipped),

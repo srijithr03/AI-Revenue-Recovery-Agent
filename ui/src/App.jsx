@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { NavLink, Route, Routes } from 'react-router-dom';
 import { fetchCases, fetchSummary } from './lib/api.js';
 import { ErrorState, Loading } from './components/common.jsx';
+import Explainer from './screens/Explainer.jsx';
 import RunOverview from './screens/RunOverview.jsx';
 import CaseDetail from './screens/CaseDetail.jsx';
 import Evaluation from './screens/Evaluation.jsx';
@@ -50,6 +51,9 @@ export default function App() {
           <div className="rail-seed">seed {seed ?? '—'}</div>
         </div>
         <div className="rail-nav">
+          <NavLink to="/explainer" className={({ isActive }) => `rail-item${isActive ? ' active' : ''}`}>
+            How it decides
+          </NavLink>
           <NavLink to="/" end className={({ isActive }) => `rail-item${isActive ? ' active' : ''}`}>
             Run overview
           </NavLink>
@@ -87,6 +91,7 @@ export default function App() {
               path="/"
               element={<RunOverview summary={summary} cases={cases} view={view} setView={setView} />}
             />
+            <Route path="/explainer" element={<Explainer summary={summary} />} />
             <Route path="/case/:id" element={<CaseDetail summary={summary} />} />
             <Route path="/evaluation" element={<Evaluation summary={summary} />} />
             <Route path="/assumptions" element={<Assumptions />} />

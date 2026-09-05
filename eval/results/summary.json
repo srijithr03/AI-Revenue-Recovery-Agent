@@ -1,14 +1,14 @@
 {
  "run": {
   "seed": 8675309,
-  "generated_at": "2026-09-05 17:49:17 IST",
-  "duration_seconds": 283.52,
+  "generated_at": "2026-09-05 19:18:58 IST",
+  "duration_seconds": 296.99,
   "python": "3.11.9",
   "n_world": 16000,
   "n_holdout": 12000,
   "n_train": 4000,
   "n_history": 25000,
-  "throughput_cases_per_second": 265415.7,
+  "throughput_cases_per_second": 281870.1,
   "ui_slice": 1500
  },
  "execution": {
@@ -135,7 +135,7 @@
     "gap": -0.0148
    }
   ],
-  "duration_seconds": 0.045,
+  "duration_seconds": 0.043,
   "per_class": [
    {
     "class": "temporary_failure",
@@ -2709,6 +2709,100 @@
    "naive_net_per_contact": 531.54
   }
  ],
+ "explainer": {
+  "uplift_example": {
+   "case_id": "REC-1018",
+   "amount": 2754.06,
+   "failure_class": "insufficient_funds",
+   "action": "retry_delayed",
+   "p_natural": 0.2772,
+   "p_treated": 0.3956,
+   "uplift": 0.1184,
+   "is_median": true
+  },
+  "population": {
+   "median_p_natural": 0.2209,
+   "median_uplift": 0.1184
+  },
+  "ev_example": {
+   "case_id": "REC-10178",
+   "amount": 3915.59,
+   "failure_class": "insufficient_funds",
+   "selected": "retry_delayed",
+   "actions": [
+    {
+     "action": "whatsapp_nudge",
+     "uplift": 0.1321,
+     "cost": 40.85,
+     "incremental_ev": 476.22,
+     "selected": false
+    },
+    {
+     "action": "retry_delayed",
+     "uplift": 0.1184,
+     "cost": 2.0,
+     "incremental_ev": 461.67,
+     "selected": true
+    },
+    {
+     "action": "sms_payment_link",
+     "uplift": 0.1053,
+     "cost": 40.25,
+     "incremental_ev": 372.14,
+     "selected": false
+    },
+    {
+     "action": "human_escalation",
+     "uplift": 0.1121,
+     "cost": 160.0,
+     "incremental_ev": 279.05,
+     "selected": false
+    },
+    {
+     "action": "method_update_request",
+     "uplift": 0.043,
+     "cost": 40.85,
+     "incremental_ev": 127.42,
+     "selected": false
+    },
+    {
+     "action": "no_action",
+     "uplift": 0.0,
+     "cost": 0.0,
+     "incremental_ev": 0.0,
+     "selected": false
+    },
+    {
+     "action": "retry_immediate",
+     "uplift": -0.0227,
+     "cost": 2.0,
+     "incremental_ev": -90.96,
+     "selected": false
+    }
+   ]
+  },
+  "budget": {
+   "contenders": 4671,
+   "contacts_used": 1800,
+   "budget": 1800
+  },
+  "rejection_example": {
+   "case_id": "REC-11462",
+   "amount": 2658.56,
+   "failure_class": "authentication_failure",
+   "selected_action": "retry_delayed",
+   "selected_ev": 220.81,
+   "rejected_action": "sms_payment_link",
+   "rejected_ev": 408.98,
+   "rejected_uplift": 0.169,
+   "selected_uplift": 0.0838,
+   "marginal_gain": 188.17,
+   "cutoff_ev": 188.21,
+   "missed_by": 0.04,
+   "rank": 1801,
+   "contenders": 4671
+  }
+ },
  "funnel": {
   "failed": 12000,
   "diagnosed": 12000,

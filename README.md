@@ -444,6 +444,25 @@ Then open <http://localhost:5173>. The API on `:8000` serves the artifacts;
 `audits.json` is 4.4MB and there is no reason to ship it to a browser so a judge
 can open one case.
 
+Four screens:
+
+| Route | What it is |
+|---|---|
+| `/explainer` | **How it decides** — the uplift idea in six panels, start here |
+| `/` | Run overview — funnel, three arms, the case table |
+| `/case/:id` | One case end to end: alternatives, policy trace, audit log |
+| `/evaluation` | The evidence — sweeps, calibration, diagnostics, limitations |
+
+`/explainer` exists because the headline reads as a loss to a retry bot unless
+you already have the uplift concept. It is deliberately thin: six panels, one
+button, no motion that isn't user-triggered. **Every figure on it is read from
+`summary.explainer`, which the harness writes** — nothing is hardcoded and
+nothing is computed in the browser, so `make eval` keeps the explanation true.
+The rejection case it shows is selected automatically as the narrowest miss in
+the batch, which is currently `REC-11462`: a contact worth ₹408.98 against ₹220.81
+for the retry actually taken, declined because the ₹188.17 it added on top fell
+₹0.04 under the cutoff.
+
 Optional environment variables — everything degrades gracefully without them:
 
 | Variable | Effect if absent |
