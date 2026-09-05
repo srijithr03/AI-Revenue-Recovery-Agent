@@ -406,7 +406,7 @@ export default function Evaluation({ summary }) {
 
       <Section
         title="Calibration — diagnosis confidence"
-        note="When the diagnosis layer says it is 93% sure, is it right 93% of the time? Points on the diagonal are perfectly calibrated. Abstentions are excluded: `unknown` is never a true class, so scoring it as wrong would put a guaranteed-zero bucket on the plot."
+        note="When the diagnosis layer says it is 87% sure, is it right 87% of the time? Points on the diagonal are perfectly calibrated. Abstentions are excluded: `unknown` is never a true class, so scoring it as wrong would put a guaranteed-zero bucket on the plot."
       >
         <div className="chart-wrap" style={{ maxWidth: 520 }}>
           <ResponsiveContainer width="100%" height={280}>
@@ -462,12 +462,14 @@ export default function Evaluation({ summary }) {
           {!summary.execution.llm_available && (
             <>
               {' '}Note that there are only two points on this plot. With no API key
-              present the LLM path never ran, and the two deterministic paths emit
-              exactly two confidence values — 0.93 for a clean gateway code and 0.55
-              for one contradicted by the customer history. A live LLM would produce
-              a continuous spread and a far more informative reliability curve. Both
-              points sitting on the diagonal is a real result on the paths that ran,
-              not a claim about the paths that did not.
+              present the LLM path never ran, and the deterministic paths emit a
+              small set of fixed confidence values — 0.87 for a clean gateway code,
+              0.68 for one contradicted by the customer history, 0.63 for a keyword
+              fallback match and 0.61 for the generic payment_declined reason. Those
+              fall into two buckets. Every value was fitted on the training split,
+              so the points landing on the diagonal is the weaker claim that the fit
+              transferred to the holdout, not evidence of a calibrated model. A live
+              LLM would produce a continuous spread and a far more informative curve.
             </>
           )}
         </div>
