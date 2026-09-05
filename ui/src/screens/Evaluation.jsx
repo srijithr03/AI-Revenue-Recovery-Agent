@@ -396,11 +396,11 @@ export default function Evaluation({ summary }) {
               (summary.sensitivity_treatment_strength || []).length}
           </span>{' '}
           perturbed worlds, across a 4× range of natural-recovery rates and the
-          full range of treatment effectiveness. It wins only where interventions
-          do nothing at all — and there it wins for the trivial reason that the
-          naive arm's spending is pure waste. The efficiency finding is equally
-          structural: the agent earns several times more per contact than the
-          naive arm in every world where interventions have any effect.
+          full range of treatment effectiveness — including the degenerate world
+          where every action is neutral, which it used to win. The efficiency
+          finding is equally structural in the other direction: the agent earns
+          several times more per contact than the naive arm in every world where
+          interventions have any effect.
         </div>
       </Section>
 
