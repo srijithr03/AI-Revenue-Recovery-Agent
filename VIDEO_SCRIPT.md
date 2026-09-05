@@ -4,11 +4,11 @@
 
 Narration is word-for-word. **ON SCREEN** tells you what to cut to and when.
 
-**729 spoken words.** That is **4:52** at a normal 150 words/minute and **5:12**
-if you slow down for the figures. The timecodes below assume the slower pace, so
-if you are under a hard 5:00 limit, read at normal speed and you have twenty
-seconds of headroom — or take the first cut in the overrun list. Do not speed up
-to fit; the numbers are the point and rushing them is worse than dropping a beat.
+**751 spoken words.** That is **5:00** at a normal 150 words/minute, and about
+**5:20** if you slow down for the figures. Under a hard 5:00 limit, read at
+normal pace and it fits — or take the first cut in the overrun list for twenty
+seconds of headroom. Do not speed up to fit: the numbers are the point, and
+rushing them is worse than dropping a beat.
 
 Three rules while recording:
 
@@ -25,9 +25,24 @@ project root.
 
 ---
 
-## 0:00 – 0:25 · Lead with the answer
+## 0:00 – 0:12 · Greeting
 
-> **ON SCREEN** — `/explainer`, the hero. Don't scroll.
+> **ON SCREEN** — `/explainer`, the hero, already loaded. You on camera or
+> voice-only, either works. Warm and brief — this is the only part of the video
+> that isn't evidence, so don't linger in it.
+
+Hi, I'm **Srijith**. This is my submission for **Track 3 of the Razorpay AI
+Buildathon** — the **AI Revenue Recovery Agent**.
+
+> **Fill in before recording:** if you're submitting as a team, say "we" and name
+> the team here. If there's a second presenter, hand over after the headline at
+> 0:35 rather than mid-beat.
+
+---
+
+## 0:12 – 0:35 · Lead with the answer
+
+> **ON SCREEN** — stay on the hero. Don't scroll yet.
 
 A failed payment isn't always lost revenue. The hard part isn't retrying — it's
 that *revenue recovered* isn't observable. You can see a payment succeed after
@@ -39,9 +54,9 @@ The second number is the more interesting one.
 
 ---
 
-## 0:25 – 0:50 · Prove it runs
+## 0:35 – 1:00 · Prove it runs
 
-> **ON SCREEN** — cut to terminal. Type it live, let it scroll, cut away ~0:50.
+> **ON SCREEN** — cut to terminal. Type it live, let it scroll, cut away ~1:00.
 
 ```bash
 python run.py all
@@ -56,7 +71,7 @@ command.
 
 ---
 
-## 0:50 – 1:45 · One decision, end to end
+## 1:00 – 1:55 · One decision, end to end
 
 > **ON SCREEN** — `/explainer` §02. Press **Apply the action** as you speak.
 
@@ -83,7 +98,7 @@ marginal gain. Not a label. Arithmetic.
 
 ---
 
-## 1:45 – 2:25 · What it deliberately walked away from
+## 1:55 – 2:35 · What it deliberately walked away from
 
 > **ON SCREEN** — `/case/REC-1621`.
 
@@ -102,7 +117,7 @@ weren't coming back.
 
 ---
 
-## 2:25 – 2:55 · Stopping, degrading, complying
+## 2:35 – 3:05 · Stopping, degrading, complying
 
 > **ON SCREEN** — `/case/REC-16014`, then `/case/REC-3980`, then `/evaluation`
 > "Policy and stopping". Move fast, ~10 seconds each.
@@ -119,7 +134,7 @@ Compliance. **70,864** policy rule evaluations. **Zero** violations.
 
 ---
 
-## 2:55 – 3:30 · What it got wrong
+## 3:05 – 3:38 · What it got wrong
 
 > **ON SCREEN** — `/case/REC-4397`.
 
@@ -136,7 +151,7 @@ executing automatically.
 
 ---
 
-## 3:30 – 4:20 · The number, honestly
+## 3:38 – 4:30 · The number, honestly
 
 > **ON SCREEN** — `/evaluation`, three-arm section.
 
@@ -160,7 +175,7 @@ comparison turns on — so it's swept ₹0 to ₹900 rather than defended.
 
 ---
 
-## 4:20 – 4:48 · Where the AI is allowed to act
+## 4:30 – 4:58 · Where the AI is allowed to act
 
 > **ON SCREEN** — `/explainer` §07, the two boundary columns.
 
@@ -176,7 +191,7 @@ tests.
 
 ---
 
-## 4:48 – 5:08 · Close on something falsifiable
+## 4:58 – 5:18 · Close on something falsifiable
 
 > **ON SCREEN** — `/evaluation`, Limitations. Hold it to the end.
 
@@ -192,7 +207,7 @@ Seed 8675309. One command reproduces every number here. Please check it.
 
 | # | Screen | What must be visible |
 |---|---|---|
-| 1 | `/explainer` hero | the headline claim |
+| 1 | `/explainer` hero | greeting, then the headline claim |
 | 2 | terminal | `python run.py all` scrolling live |
 | 3 | `/explainer` §02 | uplift bars **after** the button press |
 | 4 | `/explainer` §05 | ₹188.17 vs ₹188.21 · rank 1,801 of 4,671 |
@@ -211,10 +226,10 @@ Seed 8675309. One command reproduces every number here. Please check it.
 
 Cut in this order, and no further:
 
-1. The `/case/REC-11462` console cut at 1:45 — §05 already made the point
-2. `REC-16014` at 2:25 — keep the fallback and the policy count
-3. The uplift bars at 0:50 — painful, but the rejection beat carries the idea
+1. The `/case/REC-11462` console cut at 1:55 — §05 already made the point
+2. `REC-16014` at 2:35 — keep the fallback and the policy count
+3. The uplift bars at 1:00 — painful, but the rejection beat carries the idea
 
-**Never cut:** the naive loss at 3:30, the crossover, or the limitations. Those
+**Never cut:** the naive loss at 3:38, the crossover, or the limitations. Those
 three are why this is credible. Dropping them to save time turns a strong honest
 pitch into an ordinary one.
