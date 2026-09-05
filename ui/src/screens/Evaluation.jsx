@@ -405,6 +405,159 @@ export default function Evaluation({ summary }) {
       </Section>
 
       <Section
+        title="Is diagnosis accuracy the bottleneck?"
+        note="Diagnosis accuracy is an intermediate metric. The project is scored on net value, so an accuracy gain only matters if it moves that. This replaces the diagnosis layer with ground truth, refits the uplift table on an oracle-diagnosed history, and re-runs all three arms. The gap is the ceiling — the most any diagnosis work could possibly be worth."
+      >
+        {summary.diagnosis.oracle_ablation && (
+          <>
+            <div className="table-wrap">
+              <table className="table-plain">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th className="right">real diagnosis</th>
+                    <th className="right">perfect diagnosis</th>
+                    <th className="right">difference</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    ['agent net / case', 'agent_net_per_case'],
+                    ['vs control', 'agent_vs_control'],
+                    ['vs naive', 'agent_vs_naive'],
+                    ['net per contact', 'net_per_contact'],
+                  ].map(([label, key]) => {
+                    const a = summary.diagnosis.oracle_ablation.real[key];
+                    const b = summary.diagnosis.oracle_ablation.oracle[key];
+                    return (
+                      <tr key={key}>
+                        <td>{label}</td>
+                        <td className="num">{money(a)}</td>
+                        <td className="num">{money(b)}</td>
+                        <td className={`num${b - a < 0 ? ' neg' : ' pos'}`}>
+                          {moneySigned(b - a)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="section-note" style={{ marginTop: 12 }}>
+              Ceiling from perfect diagnosis:{' '}
+              <span className="mono">
+                {moneySigned(summary.diagnosis.oracle_ablation.ceiling_net_per_case)}
+              </span>{' '}
+              per case. <strong>Diagnosis accuracy is not the bottleneck.</strong> The
+              uplift table is keyed on the <em>predicted</em> class, so it learns the
+              right action for &ldquo;cases that look like insufficient funds&rdquo;
+              with the mislabels included, and absorbs most diagnostic error before it
+              reaches a decision. Work aimed at raising accuracy will not move the
+              headline — which is why this was measured before any was done.
+            </div>
+          </>
+        )}
+      </Section>
+
+      <Section
+        title="Diagnosis — per class"
+        note="Overall accuracy hides everything worth knowing. Support is how many cases truly are that class; precision is how often the agent is right when it says so; recall is how many it finds."
+      >
+        <div className="table-wrap">
+          <table className="table-plain">
+            <thead>
+              <tr>
+                <th>class</th>
+                <th className="right">support</th>
+                <th className="right">predicted</th>
+                <th className="right">precision</th>
+                <th className="right">recall</th>
+                <th className="right">f1</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(summary.diagnosis.per_class || []).map((r) => (
+                <tr key={r.class}>
+                  <td className="mono">{r.class}</td>
+                  <td className="num">{count(r.support)}</td>
+                  <td className="num">{count(r.predicted)}</td>
+                  <td className="num">{r.precision == null ? '—' : r.precision.toFixed(3)}</td>
+                  <td className="num">{r.recall == null ? '—' : r.recall.toFixed(3)}</td>
+                  <td className="num">{r.f1 == null ? '—' : r.f1.toFixed(3)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="section-note" style={{ marginTop: 12 }}>
+          <span className="mono">repeated_failure</span> is the weak class and it is
+          weak by construction: no real gateway emits a &ldquo;this is the nth
+          failure&rdquo; reason, so it is reachable only from customer history, and
+          the history is a noisy correlate rather than a definition.
+        </div>
+      </Section>
+
+      <Section
+        title="Diagnosis — where the error actually is"
+        note="Ranking slices by their own accuracy tells you where the agent is worst. Ranking by share of total error tells you where the work is. They are rarely the same list."
+      >
+        <div className="table-wrap">
+          <table className="table-plain">
+            <thead>
+              <tr>
+                <th>gateway code</th>
+                <th className="right">cases</th>
+                <th className="right">accuracy</th>
+                <th className="right">errors</th>
+                <th className="right">share of all error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(summary.diagnosis.by_gateway_code || []).slice(0, 8).map((r) => (
+                <tr key={r.gateway_code}>
+                  <td className="mono">{r.gateway_code}</td>
+                  <td className="num">{count(r.n)}</td>
+                  <td className="num">{r.accuracy.toFixed(3)}</td>
+                  <td className="num">{count(r.errors)}</td>
+                  <td className="num">{pct(r.share_of_all_errors)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="table-wrap" style={{ marginTop: 16 }}>
+          <table className="table-plain">
+            <thead>
+              <tr>
+                <th>true class</th>
+                <th>read as</th>
+                <th className="right">cases</th>
+                <th className="right">share of all error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(summary.diagnosis.top_confusions || []).slice(0, 6).map((r) => (
+                <tr key={`${r.true}-${r.predicted}`}>
+                  <td className="mono">{r.true}</td>
+                  <td className="mono">{r.predicted}</td>
+                  <td className="num">{count(r.n)}</td>
+                  <td className="num">{pct(r.share_of_all_errors)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="section-note" style={{ marginTop: 12 }}>
+          The single largest contributor is{' '}
+          <span className="mono">payment_failed</span> — the generic reason carrying
+          only free text, which routes to the LLM path. With no API key present that
+          path runs on a keyword heuristic, so this slice is the cost of the
+          degradation rather than a flaw in the diagnosis design.
+        </div>
+      </Section>
+
+      <Section
         title="Calibration — diagnosis confidence"
         note="When the diagnosis layer says it is 87% sure, is it right 87% of the time? Points on the diagonal are perfectly calibrated. Abstentions are excluded: `unknown` is never a true class, so scoring it as wrong would put a guaranteed-zero bucket on the plot."
       >

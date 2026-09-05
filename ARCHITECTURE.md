@@ -66,7 +66,7 @@ is designed but not implemented.
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ L8  EVALUATION                    eval/harness.py · run_eval.py         │
 │     three arms · stratified assignment · paired counterfactual          │
-│     bootstrap + Wilson intervals · three sensitivity sweeps             │
+│     bootstrap + Wilson intervals · three sweeps · diagnostics.py        │
 │     may read ground truth — it is the scorer                            │
 └─────────────────────────────────────────────────────────────────────────┘
 ```

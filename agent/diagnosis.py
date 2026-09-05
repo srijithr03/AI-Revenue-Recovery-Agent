@@ -43,12 +43,28 @@ MODEL = "claude-haiku-4-5-20251001"
 # The reliability plot on the evaluation screen is the check on whether they are
 # honest.
 # ---------------------------------------------------------------------------
-CONF_MAPPED_CODE = 0.87        # measured 0.8655 on 2,803 clean mapped cases
-CONF_GENERIC_CODE = 0.61       # measured 0.6078 on 334 `payment_declined` cases
-CONF_CONTRADICTION = 0.68      # measured 0.6790 on 271 contradicted cases
+CONF_MAPPED_CODE = 0.94        # measured 0.9367 on 2,842 clean mapped cases
+CONF_CONTRADICTION = 0.59      # measured 0.5925 on 265 contradicted cases
 CONF_LLM_DEFAULT = 0.70        # used when a model returns an unusable confidence
-CONF_FALLBACK_KEYWORD = 0.63   # measured 0.6281 on 363 keyword-matched cases
+CONF_FALLBACK_KEYWORD = 0.68   # measured 0.6828 on 309 keyword-matched cases
 CONF_FALLBACK_NONE = 0.30      # nothing matched -> abstain
+CONF_GENERIC_RISK = 0.98       # measured 0.9765 on 213 generic + high-risk cases
+CONF_GENERIC_LOWRISK = 0.75    # measured 0.7519 on 129 generic + low-risk cases
+CONF_HISTORY_REPEAT = 0.56     # measured 0.5625 on 16 history-only repeat cases
+CONF_HISTORY_RISK = 0.90       # measured 1.0000 on 23 cases -- too few to claim
+                               # certainty, so held at 0.90 rather than raised
+
+# Risk-score cuts used to read a GENERIC gateway reason in context. Two values,
+# because they are applied to two populations with very different base rates and
+# each was fitted on its own slice of the training split:
+#
+#   payment_declined is ~62% risk blocks, so a low cut captures them cheaply
+#   (measured 0.974 separation at 0.35).
+#
+#   The free-text slice is ~9% risk blocks, so it needs a strict cut to avoid
+#   sweeping in the majority (measured 0.980 at 0.50 against 0.712 at 0.35).
+GENERIC_RISK_SPLIT = 0.35
+FALLBACK_RISK_SPLIT = 0.50
 
 # ---------------------------------------------------------------------------
 # Deterministic path
@@ -198,15 +214,42 @@ def validate_llm_proposal(raw: Any) -> Diagnosis | None:
 # Fallback path
 # ---------------------------------------------------------------------------
 
-def keyword_fallback(message: str, reason: str) -> Diagnosis:
+def keyword_fallback(case: dict[str, Any], reason: str) -> Diagnosis:
     """Degrade gracefully, at LOWERED confidence.
 
     The point is not to match the LLM. It is to keep the batch moving and to be
     honest, in the confidence value, that this was a downgraded decision.
+
+    This takes the whole CASE rather than just the message. It used to take only
+    the free text, which meant that on the 15% of records with no usable code it
+    ignored the customer history entirely -- and the error analysis showed that
+    slice carrying 39.6% of all diagnostic error, with 692 cases abstaining at
+    zero accuracy while sitting on informative features.
+
+    Abstention is still the right answer when there is genuinely nothing to go
+    on. Abstaining while holding strong evidence is not humility, it is ignoring
+    the evidence, so the history branches below fire only where the training
+    split says they are more likely right than wrong.
     """
-    text = (message or "").lower()
+    text = (case.get("gateway_message") or "").lower()
+    pf = int(case.get("prior_failures", 0))
+    risk = float(case.get("risk_score", 0.0))
+
     for pattern, cls in KEYWORD_RULES:
         if re.search(pattern, text):
+            # The same contradiction logic the rules path applies. Identical
+            # evidence should be weighed identically regardless of which path
+            # produced the class; this used to fire only on mapped codes.
+            if pf >= CONTRADICTION_PRIOR_FAILURES and cls != "repeated_failure":
+                return Diagnosis(
+                    failure_class="repeated_failure",
+                    confidence=CONF_CONTRADICTION,
+                    signals=[f"keyword heuristic matched {cls}",
+                             f"{pf} prior failures on this instrument contradicts it",
+                             f"llm unavailable: {reason}"],
+                    path="fallback_keyword",
+                    llm_error=reason,
+                )
             return Diagnosis(
                 failure_class=cls,
                 confidence=CONF_FALLBACK_KEYWORD,
@@ -214,10 +257,35 @@ def keyword_fallback(message: str, reason: str) -> Diagnosis:
                 path="fallback_keyword",
                 llm_error=reason,
             )
+
+    # Nothing in the text. The history is not nothing.
+    if pf >= CONTRADICTION_PRIOR_FAILURES:
+        return Diagnosis(
+            failure_class="repeated_failure",
+            confidence=CONF_HISTORY_REPEAT,
+            signals=["no keyword matched",
+                     f"{pf} prior failures on this instrument",
+                     f"llm unavailable: {reason}"],
+            path="fallback_history",
+            llm_error=reason,
+        )
+    if risk >= FALLBACK_RISK_SPLIT:
+        return Diagnosis(
+            failure_class="risk_blocked",
+            confidence=CONF_HISTORY_RISK,
+            signals=["no keyword matched",
+                     f"risk score {risk:.3f} >= {FALLBACK_RISK_SPLIT}",
+                     f"llm unavailable: {reason}"],
+            path="fallback_history",
+            llm_error=reason,
+        )
+
+    # Genuinely nothing. Abstain, and mean it.
     return Diagnosis(
         failure_class="unknown",
         confidence=CONF_FALLBACK_NONE,
-        signals=["no keyword matched", f"llm unavailable: {reason}"],
+        signals=["no keyword matched", "no decisive customer-history signal",
+                 f"llm unavailable: {reason}"],
         path="fallback_none",
         llm_error=reason,
     )
@@ -335,7 +403,7 @@ class LLMDiagnoser:
         if not self.available or self.client is None:
             with self._lock:
                 self.stats["llm_fallback"] += 1
-            return keyword_fallback(msg, self.unavailable_reason)
+            return keyword_fallback(case, self.unavailable_reason)
 
         try:
             resp = self.client.messages.create(
@@ -351,14 +419,14 @@ class LLMDiagnoser:
             # what actually happened.
             with self._lock:
                 self.stats["llm_fallback"] += 1
-            return keyword_fallback(msg, type(exc).__name__)
+            return keyword_fallback(case, type(exc).__name__)
 
         validated = validate_llm_proposal(text)
         if validated is None:
             # Failure recovery path 3: malformed or out-of-enum response.
             with self._lock:
                 self.stats["llm_fallback"] += 1
-            return keyword_fallback(msg, "malformed_or_out_of_enum_response")
+            return keyword_fallback(case, "malformed_or_out_of_enum_response")
 
         if self.use_cache:
             with self._lock:
@@ -392,9 +460,30 @@ def diagnose_rules(case: dict[str, Any]) -> Diagnosis | None:
     signals = [f"gateway code {code}"]
     if code in GENERIC_CODES:
         # A real code, but one the gateway uses when it has nothing specific to
-        # say. Resolve it to the modal cause and say so, at reduced confidence.
-        conf = CONF_GENERIC_CODE
-        signals.append("generic decline reason; modal cause assumed")
+        # say. Resolving it to a single modal class throws away the context that
+        # actually separates the causes underneath it.
+        #
+        # `risk_score` is already observable and, measured on the training split,
+        # separates a risk block from the rest of the `payment_declined`
+        # population at 0.974 -- against 0.608 for assuming the modal class. The
+        # error analysis put this code at 14.0% of all diagnostic error, almost
+        # all of it insufficient_funds being read as risk_blocked.
+        #
+        # Note this uses an EXISTING observable feature better. It does not make
+        # `payment_declined` more diagnostic than it is; the code still carries
+        # no information on its own, and a case with no risk signal still cannot
+        # be resolved past the modal low-risk cause.
+        risk = float(case.get("risk_score", 0.0))
+        if risk >= GENERIC_RISK_SPLIT:
+            cls = "risk_blocked"
+            conf = CONF_GENERIC_RISK
+            signals.append(f"generic decline reason; risk score {risk:.3f} "
+                           f">= {GENERIC_RISK_SPLIT}")
+        else:
+            cls = "insufficient_funds"
+            conf = CONF_GENERIC_LOWRISK
+            signals.append(f"generic decline reason; risk score {risk:.3f} "
+                           f"< {GENERIC_RISK_SPLIT}, modal low-risk cause")
     else:
         conf = CONF_MAPPED_CODE
 

@@ -366,6 +366,27 @@ def _draw_failure_class(rng: np.random.Generator, prior_failures: int,
         weights["temporary_failure"] *= 0.7
     elif prior_failures == 2:
         weights["repeated_failure"] *= 2.5
+    elif prior_failures == 1:
+        # One prior failure does not yet make a pattern.
+        weights["repeated_failure"] *= 0.30
+    else:
+        # A17 -- `repeated_failure` is DEFINITIONALLY impossible with no prior
+        # failures on the instrument. The class means "the nth consecutive
+        # failure"; with n = 1 there is nothing being repeated.
+        #
+        # This was a real defect, found by the diagnostic error analysis rather
+        # than by reading the code: the class kept its full base weight at
+        # prior_failures == 0, so 137 training cases were labelled
+        # `repeated_failure` with no failure to repeat. They were undiagnosable
+        # by construction -- no observable feature could identify them, because
+        # the label contradicted the only feature that defines it -- and they
+        # capped recall on the class at a level no agent could reach.
+        #
+        # Removing them makes the world COHERENT, not easier in the sense that
+        # matters: no signal is added, and nothing that was genuinely ambiguous
+        # becomes clear. But it does raise measured accuracy, so it is reported
+        # as a world fix and not as an agent improvement.
+        weights["repeated_failure"] = 0.0
 
     # Brand-new customers skew toward setup problems, not transient ones.
     if tenure_days < 30:

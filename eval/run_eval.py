@@ -32,6 +32,7 @@ from agent.uplift import fit_from_history
 from eval.calibration import diagnosis_reliability, uplift_reliability
 from eval.harness import (CONTACT_BUDGET_PER_1000, Harness, compare,
                           compare_paired, recovery_by_class, value_band)
+from eval.diagnostics import analyse, build_rows, oracle_ablation
 from eval.assumption_sweep import (sweep_base_recovery,
                                    sweep_treatment_strength)
 from eval.sensitivity import sweep_annoyance, sweep_budget
@@ -222,6 +223,25 @@ def main() -> int:
     print(f"  abstention rate {1 - len(committed) / len(diagnoses):.3f}")
     print(f"  LLM fallback invocations: {llm.stats['llm_fallback']:,}")
 
+    diag_detail = analyse(build_rows(holdout, truth, diagnoses))
+    print("")
+    print("  per-class (support = how many truly are this class)")
+    print(f"  {'class':<24}{'support':>9}{'predicted':>11}"
+          f"{'precision':>11}{'recall':>9}{'f1':>8}")
+    for r in diag_detail["per_class"]:
+        fmt = lambda v: f"{v:.4f}" if v is not None else "     -"
+        print(f"  {r['class']:<24}{r['support']:>9,}{r['predicted']:>11,}"
+              f"{fmt(r['precision']):>11}{fmt(r['recall']):>9}{fmt(r['f1']):>8}")
+    print("")
+    print("  where the error actually is (ranked by share of total error)")
+    for r in diag_detail["by_gateway_code"][:5]:
+        print(f"    {r['gateway_code']:<34}{r['n']:>7,} cases  "
+              f"accuracy {r['accuracy']:.4f}  {r['share_of_all_errors']:>6.1%} of error")
+    print("  most costly confusions")
+    for r in diag_detail["top_confusions"][:4]:
+        print(f"    {r['true']:<24}read as {r['predicted']:<24}"
+              f"{r['n']:>6,}  {r['share_of_all_errors']:>6.1%} of error")
+
     # ---- L2 -------------------------------------------------------------
     rule("L2  UPLIFT MODEL")
     t0 = time.perf_counter()
@@ -393,6 +413,32 @@ def main() -> int:
         print(f"  efficiency ratio (agent/naive per contact) holds between "
               f"{min(_ratios):.1f}x and {max(_ratios):.1f}x across worlds where "
               f"interventions have any effect")
+
+    rule("IS DIAGNOSIS ACCURACY THE BOTTLENECK?")
+    print("Diagnosis accuracy is an intermediate metric. The project is scored")
+    print("on net value, so an accuracy gain only matters if it moves that.")
+    print("")
+    print("This replaces the diagnosis layer with GROUND TRUTH, refits the")
+    print("uplift table on an oracle-diagnosed history, and re-runs all three")
+    print("arms. The gap is the ceiling: the most that any diagnosis work could")
+    print("possibly be worth.")
+    print("")
+    orc = oracle_ablation(holdout, truth, diagnoses, seed)
+    print(f"  ({orc['fit_note']})")
+    print(f"  {'':<26}{'real diagnosis':>16}{'perfect diagnosis':>20}")
+    for k, label in (("agent_net_per_case", "agent net / case"),
+                     ("agent_vs_control", "vs control"),
+                     ("agent_vs_naive", "vs naive"),
+                     ("net_per_contact", "net per contact")):
+        print(f"  {label:<26}{orc['real'][k]:>16,.2f}{orc['oracle'][k]:>20,.2f}")
+    print("")
+    print(f"  CEILING from perfect diagnosis: Rs {orc['ceiling_net_per_case']:+,.2f} per case")
+    if abs(orc["ceiling_net_per_case"]) < 25:
+        print("  -> Diagnosis accuracy is NOT the bottleneck. The uplift table is")
+        print("     keyed on the PREDICTED class, so it learns the right action for")
+        print("     'cases that look like X' with the mislabels included, and")
+        print("     absorbs most diagnostic error before it reaches a decision.")
+        print("     Work aimed at raising accuracy will not move the headline.")
 
     # ---- policy ----------------------------------------------------------
     rule("POLICY")
@@ -596,6 +642,13 @@ def main() -> int:
             "paths": dict(paths),
             "reliability": diag_rel,
             "duration_seconds": round(t_diag, 3),
+            "per_class": diag_detail["per_class"],
+            "confusion_matrix": diag_detail["confusion_matrix"],
+            "by_path": diag_detail["by_path"],
+            "by_method": diag_detail["by_method"],
+            "by_gateway_code": diag_detail["by_gateway_code"],
+            "top_confusions": diag_detail["top_confusions"],
+            "oracle_ablation": orc,
         },
         "uplift": {"reliability": up_rel},
         "arms_paired": {a: pres[a].summary() for a in ("control", "naive", "agent")},

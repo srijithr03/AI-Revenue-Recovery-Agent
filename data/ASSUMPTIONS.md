@@ -236,10 +236,23 @@ training split only:
 
 | Path | Cases | Measured accuracy | Constant |
 |---|---:|---:|---|
-| clean mapped code | 2,803 | 0.8655 | `CONF_MAPPED_CODE = 0.87` |
-| generic `payment_declined` | 334 | 0.6078 | `CONF_GENERIC_CODE = 0.61` |
-| contradicted -> `repeated_failure` | 271 | 0.6790 | `CONF_CONTRADICTION = 0.68` |
-| keyword fallback matched | 363 | 0.6281 | `CONF_FALLBACK_KEYWORD = 0.63` |
+| clean mapped code | 2,842 | 0.9367 | `CONF_MAPPED_CODE = 0.94` |
+| generic + risk score >= 0.35 | 213 | 0.9765 | `CONF_GENERIC_RISK = 0.98` |
+| generic + risk score < 0.35 | 129 | 0.7519 | `CONF_GENERIC_LOWRISK = 0.75` |
+| contradicted -> `repeated_failure` | 265 | 0.5925 | `CONF_CONTRADICTION = 0.59` |
+| keyword fallback matched | 309 | 0.6828 | `CONF_FALLBACK_KEYWORD = 0.68` |
+| history only, 4+ prior failures | 16 | 0.5625 | `CONF_HISTORY_REPEAT = 0.56` |
+| history only, high risk score | 23 | 1.0000 | `CONF_HISTORY_RISK = 0.90` |
+
+The last row is deliberately **not** set to its measured value. Twenty-three
+cases is nowhere near enough to justify claiming certainty, and a confidence of
+1.0 is never an honest output, so it is held at 0.90.
+
+**`payment_declined` is now read in context.** It is still a generic reason with
+no information of its own — that property is load-bearing and preserved — but
+`risk_score` is already an observable feature, and using it lifts that slice from
+0.608 to 0.977 (high risk) and 0.752 (low risk). This uses existing evidence
+better rather than making the code more diagnostic than it is.
 
 **14.6%** of records carry the uninformative catch-all `payment_failed` plus free
 text only. `payment_failed` is Razorpay's real documented general-decline reason
@@ -258,6 +271,36 @@ class is over-concentrated in one code relative to a real merchant's queue, wher
 issuer-specific NPCI decline codes (U-series, Z-series) would also appear. Those
 are not in Razorpay's published merchant-facing taxonomy, so they are not
 modelled rather than being guessed at.
+
+---
+
+## A17 - `repeated_failure` requires prior failures
+
+`repeated_failure` cannot occur when `prior_failures == 0`, and is heavily
+down-weighted at 1.
+
+**This was a defect, not a design choice.** The class kept its full base weight
+at zero prior failures, so 137 training cases were labelled *"the nth consecutive
+failure on this instrument"* with no failure to repeat. The label contradicted
+the only feature that defines it, which made those cases undiagnosable by
+construction and capped recall on the class at a level no agent could reach.
+
+It was found by the diagnostic error analysis (`python -m eval.diagnostics`),
+not by reading the code — the confusion matrix showed `repeated_failure` recall
+at 0.318 against precision of 0.694, and the per-feature breakdown showed
+`P(repeated_failure | prior_failures = 0)` sitting at 0.092 where it should have
+been zero.
+
+**Honest accounting.** Fixing this makes the world *coherent*; it does not make
+it easier in the sense that matters, because no signal is added and nothing that
+was genuinely ambiguous becomes clear. But it does raise measured diagnosis
+accuracy — roughly 2 of the ~8 points gained in that iteration — so it is
+reported as a world fix rather than an agent improvement. It also lowers the
+realised `repeated_failure` share from 16.2% to 10.2%, closer to the A2 prior.
+
+**Direction of effect on the headline:** negative for the agent. Agent-vs-naive
+moved from -Rs 43.57 to -Rs 65.56 across this change and the diagnosis work
+combined.
 
 ---
 
