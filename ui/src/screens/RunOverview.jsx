@@ -96,13 +96,28 @@ export default function RunOverview({ summary, cases: casesOrNull, view, setView
         </MetricRow>
       </Section>
 
-      <Section title="Funnel">
+      {/* Every tile is a PIPELINE count, on the same denominator, so the three
+          terminal states add back to `eligible`:
+
+              3,064 recovered + 5,274 stopped + 187 escalated = 8,525
+
+          This used to show `recovered_confirmed` (3,575) here. That figure is
+          correct but it is the agent ARM's confirmed recoveries across all
+          12,000 cases -- it includes cases never actioned that came back on
+          their own. Mixed into a funnel of pipeline counts it made the row fail
+          to add up, and adding those three numbers is the first thing a reader
+          does. It belongs in the arms table, where its denominator is stated,
+          and it is still there. */}
+      <Section
+        title="Funnel"
+        note="Pipeline counts on one denominator: recovered, stopped and escalated are the three terminal states and sum back to eligible."
+      >
         <div className="funnel">
           <Stage label="failed" n={f.failed} />
           <Stage label="diagnosed" n={f.diagnosed} note={`${count(f.diagnosed_unknown)} unknown`} />
           <Stage label="eligible" n={f.eligible} note={`${count(f.ineligible)} not pursued`} />
           <Stage label="actioned" n={f.actioned} />
-          <Stage label="recovered" n={f.recovered_confirmed} note="confirmed" />
+          <Stage label="recovered" n={f.recovered} note="terminal state" />
           <Stage label="stopped" n={f.stopped} />
           <Stage label="escalated" n={f.escalated} />
         </div>
