@@ -398,10 +398,14 @@ a:focus-visible, button:focus-visible, tr:focus-visible, select:focus-visible, t
                      border-top: 1px solid var(--border); }
 .in-hero-cell-stat span { font-size: 11px; color: var(--text-muted); }
 
+/* Reveal fails OPEN, deliberately. The resting state is visible and JS adds
+   .is-out to sections not yet reached -- so if the script breaks, or the
+   browser will not run the transition, the reader gets readable content rather
+   than a blank page. The inverse (hidden by default, revealed by animation)
+   strands the whole page the moment anything goes wrong with the animation. */
 .in-block { padding: 72px 0; border-bottom: 1px solid var(--border);
-            opacity: 0; transform: translateY(14px);
-            transition: opacity 520ms ease, transform 520ms ease; }
-.in-block.is-in { opacity: 1; transform: none; }
+            transition: opacity 460ms ease, transform 460ms ease; }
+.in-block.is-out { opacity: 0; transform: translateY(14px); }
 .in-eyebrow { font-size: 11px; color: var(--text-muted); letter-spacing: 0.06em; margin-bottom: 14px; }
 .in-h2 { font-size: 32px; line-height: 1.18; letter-spacing: -0.018em; font-weight: 500;
          margin: 0; max-width: 780px; }
@@ -514,4 +518,106 @@ a:focus-visible, button:focus-visible, tr:focus-visible, select:focus-visible, t
   .in-block { transition: none; transform: none; }
   .in-fill.gain { transition: none; }
   .in-nav { backdrop-filter: none; }
+}
+
+/* ================================================ intro theme: dark neo-mint
+ *
+ * Scoped ENTIRELY to .intro by redefining the tokens there. The console keeps
+ * the :root values untouched -- nothing below can leak into it, because every
+ * rule here is either a token override on .intro or a selector inside it.
+ *
+ * THE COLOUR CONTRACT IS PRESERVED, and that is the whole point of doing it
+ * this way. Mint is not "emphasis". Mint means exactly what green means in the
+ * console:
+ *
+ *     mint   #10B981   recovery, uplift gained, a positive delta
+ *     amber  #F59E0B   stopped, deferred, the budget cutoff
+ *     red    #F87171   blocked, negative uplift
+ *     white  #F8FAFC   emphasis, buttons, active states, important numbers
+ *
+ * So emphasis is carried by WEIGHT and WHITE, never by the accent. A judge who
+ * reads the intro arrives at the console already knowing that green means
+ * recovered and amber means stopped -- the theme teaches the console's grammar
+ * instead of contradicting it.
+ *
+ * The console's own accents are built for a white ground and fail on this one
+ * (#854f0b is 2.85:1, #a32d2d is 2.71:1). The values here are their dark-ready
+ * siblings, same meanings, all clearing AA:
+ *
+ *     mint 7.55:1 canvas / 5.77:1 card
+ *     amber 8.92 / 6.81      red 6.92 / 5.29
+ *     text 18.30             muted 7.47 / 5.71
+ */
+
+.intro {
+  --surface: #0b0f19;      /* deep canvas */
+  --surface-alt: #111827;  /* subtle fills: formula, table header */
+  --card: #1e293b;         /* elevated, bordered components */
+  --border: #263244;
+  --text: #f8fafc;
+  --text-muted: #94a3b8;
+
+  --recovered: #10b981;
+  --stopped: #f59e0b;
+  --blocked: #f87171;
+
+  color-scheme: dark;
+}
+
+/* Elevated surfaces. Canvas is the page, surface-alt is a subtle fill, card is
+   anything with a border around it. */
+.intro .in-hero-cell,
+.intro .in-card,
+.intro .in-flow-step,
+.intro .in-verdict-col,
+.intro .in-stage-detail,
+.intro .in-table-wrap,
+.intro .in-stage { background: var(--card); }
+
+.intro .in-nav { background: rgba(11, 15, 25, 0.86); }
+
+/* The uplift gain is the one place mint appears at full strength, because it is
+   the one place the page is talking about recovery. */
+.intro .in-fill.base { background: var(--text-muted); opacity: 0.22; }
+.intro .in-fill.gain { background: var(--recovered); }
+.intro .in-hero-cell-stat { color: var(--text); }
+
+/* Emphasis is white, not mint. Buttons, the active pipeline stage and the
+   accented card border all use --text so the accent keeps its meaning. */
+.intro .in-card.accent { border-color: var(--text); }
+.intro .in-stage.active { background: var(--text); color: var(--surface); border-color: var(--text); }
+.intro .in-btn { background: transparent; }
+.intro .in-btn:hover { background: var(--card); }
+
+/* Amber stays amber: the cutoff and the missed-by verdict are "stopped", the
+   same state the console paints amber. */
+.intro .in-flow-step.accent { border-color: var(--stopped); }
+.intro .in-verdict-col.why { border-color: var(--stopped); }
+.intro .in-missed { color: var(--stopped); }
+
+.intro .in-table tr.sel td:first-child { box-shadow: inset 2px 0 0 var(--text); }
+.intro .in-stage-detail { border-left-color: var(--text); }
+.intro .in-inline-link { color: var(--recovered); }
+
+/* -------------------------------------------------------- the handoff
+ *
+ * The last section reverts to the console's light palette. Clicking through
+ * from #0b0f19 straight to #ffffff is a hard flash, and it frames the intro as
+ * a marketing site the reader is leaving. Handing over inside the page makes
+ * the transition deliberate -- and the CTA already looks like the surface it
+ * leads to. */
+.intro .in-cta {
+  --surface: #ffffff;
+  --surface-alt: #f7f7f5;
+  --card: #ffffff;
+  --border: #e3e2dd;
+  --text: #1a1a18;
+  --text-muted: #6b6a65;
+  --recovered: #0f6e56;
+  --stopped: #854f0b;
+  --blocked: #a32d2d;
+  color-scheme: light;
+  background: var(--surface);
+  color: var(--text);
+  border-top: 1px solid var(--border);
 }

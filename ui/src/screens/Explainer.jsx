@@ -42,20 +42,35 @@ function useReveal() {
   React.useEffect(() => {
     const el = ref.current;
     if (!el || seen) return undefined;
-    if (typeof IntersectionObserver === 'undefined') {
+    const scroller = document.getElementById(SCROLL_ID);
+    if (!scroller) {
       setSeen(true);
       return undefined;
     }
-    // root is the intro's own scroller, not the viewport. The console shell
-    // pins the document at 100vh with overflow hidden, so nothing here would
-    // ever intersect a viewport-rooted observer and every section would sit at
-    // opacity 0 forever.
-    const io = new IntersectionObserver(
-      (entries) => entries.forEach((e) => e.isIntersecting && setSeen(true)),
-      { root: document.getElementById(SCROLL_ID), rootMargin: '0px 0px -10% 0px', threshold: 0.05 },
-    );
-    io.observe(el);
-    return () => io.disconnect();
+    // A position test rather than an IntersectionObserver, deliberately.
+    //
+    // An observer only fires when the intersection ratio crosses a threshold.
+    // Jumping via the nav takes a section from below the viewport to above it
+    // in a single frame without ever intersecting, so the observer never fires
+    // and that section stays at opacity 0 for the rest of the session -- a
+    // reader who jumps to "How it works" and then scrolls back up finds the
+    // earlier sections blank.
+    //
+    // Testing the top edge against the scroller's bottom reveals a section both
+    // when it enters from below AND when it is already above (top goes
+    // negative), which is what makes the jump case correct.
+    const check = () => {
+      const r = el.getBoundingClientRect();
+      const b = scroller.getBoundingClientRect();
+      if (r.top < b.bottom - b.height * 0.08) setSeen(true);
+    };
+    check();
+    scroller.addEventListener('scroll', check, { passive: true });
+    window.addEventListener('resize', check);
+    return () => {
+      scroller.removeEventListener('scroll', check);
+      window.removeEventListener('resize', check);
+    };
   }, [seen]);
   return [ref, seen];
 }
@@ -66,7 +81,7 @@ function Block({ id, eyebrow, title, lede, children, wide }) {
     <section
       id={id}
       ref={ref}
-      className={`in-block${seen ? ' is-in' : ''}${wide ? ' wide' : ''}`}
+      className={`in-block${seen ? '' : ' is-out'}${wide ? ' wide' : ''}`}
     >
       {eyebrow && <div className="in-eyebrow mono">{eyebrow}</div>}
       {title && <h2 className="in-h2">{title}</h2>}
