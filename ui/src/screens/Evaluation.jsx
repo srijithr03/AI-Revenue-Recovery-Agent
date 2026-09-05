@@ -313,6 +313,98 @@ export default function Evaluation({ summary }) {
       </Section>
 
       <Section
+        title="Sensitivity — assumption error"
+        note="The two sweeps above move the agent inside a fixed world. This one moves the world: it perturbs the base natural-recovery rates and the treatment effects, regenerates the population and the historical log, refits the agent on that history, and re-runs all three arms. Batch size narrows the interval on a simulated delta; it does nothing about that delta sitting inside a world whose base rates were assumed."
+      >
+        <div className="table-wrap">
+          <table className="table-plain">
+            <thead>
+              <tr>
+                <th className="right">natural recovery, odds scale</th>
+                <th className="right">mean p_natural</th>
+                <th className="right">control</th>
+                <th className="right">naive</th>
+                <th className="right">agent</th>
+                <th className="right">agent − naive</th>
+                <th className="right">agent per contact</th>
+                <th>winner</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(summary.sensitivity_natural_recovery || []).map((row) => (
+                <tr key={row.natural_recovery_odds_scale}>
+                  <td className="num">{row.natural_recovery_odds_scale.toFixed(2)}</td>
+                  <td className="num">{row.mean_p_natural.toFixed(3)}</td>
+                  <td className="num">{money(row.control_net_per_case)}</td>
+                  <td className="num">{money(row.naive_net_per_case)}</td>
+                  <td className="num">{money(row.agent_net_per_case)}</td>
+                  <td className={`num${row.agent_vs_naive < 0 ? ' neg' : ' pos'}`}>
+                    {moneySigned(row.agent_vs_naive)}
+                  </td>
+                  <td className="num">{money(row.agent_net_per_contact)}</td>
+                  <td className="mono">{row.agent_wins ? 'agent' : 'naive'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="table-wrap" style={{ marginTop: 16 }}>
+          <table className="table-plain">
+            <thead>
+              <tr>
+                <th className="right">treatment strength</th>
+                <th className="right">control</th>
+                <th className="right">naive</th>
+                <th className="right">agent</th>
+                <th className="right">agent − naive</th>
+                <th className="right">agent per contact</th>
+                <th className="right">naive per contact</th>
+                <th>winner</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(summary.sensitivity_treatment_strength || []).map((row) => (
+                <tr key={row.treatment_strength_scale}>
+                  <td className="num">{row.treatment_strength_scale.toFixed(2)}</td>
+                  <td className="num">{money(row.control_net_per_case)}</td>
+                  <td className="num">{money(row.naive_net_per_case)}</td>
+                  <td className="num">{money(row.agent_net_per_case)}</td>
+                  <td className={`num${row.agent_vs_naive < 0 ? ' neg' : ' pos'}`}>
+                    {moneySigned(row.agent_vs_naive)}
+                  </td>
+                  <td className="num">{money(row.agent_net_per_contact)}</td>
+                  <td className="num">{money(row.naive_net_per_contact)}</td>
+                  <td className="mono">{row.agent_wins ? 'agent' : 'naive'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="section-note" style={{ marginTop: 12 }}>
+          The verdict is structural, not an artefact of the base rates. The agent
+          loses to naive on net value in{' '}
+          <span className="mono">
+            {[...(summary.sensitivity_natural_recovery || []),
+              ...(summary.sensitivity_treatment_strength || [])]
+              .filter((r) => !r.agent_wins).length}
+          </span>{' '}
+          of{' '}
+          <span className="mono">
+            {(summary.sensitivity_natural_recovery || []).length +
+              (summary.sensitivity_treatment_strength || []).length}
+          </span>{' '}
+          perturbed worlds, across a 4× range of natural-recovery rates and the
+          full range of treatment effectiveness. It wins only where interventions
+          do nothing at all — and there it wins for the trivial reason that the
+          naive arm's spending is pure waste. The efficiency finding is equally
+          structural: the agent earns several times more per contact than the
+          naive arm in every world where interventions have any effect.
+        </div>
+      </Section>
+
+      <Section
         title="Calibration — diagnosis confidence"
         note="When the diagnosis layer says it is 93% sure, is it right 93% of the time? Points on the diagonal are perfectly calibrated. Abstentions are excluded: `unknown` is never a true class, so scoring it as wrong would put a guaranteed-zero bucket on the plot."
       >

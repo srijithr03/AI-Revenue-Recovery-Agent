@@ -21,21 +21,36 @@ Net value is **recovered revenue minus intervention cost** — never gross.
 
 | Arm | What it does | Net / case | Recovery | Contacts | Cost |
 |---|---|---:|---:|---:|---:|
-| **control** | nothing at all | ₹914.65 | 22.6% | 0 | ₹0 |
-| **naive** | retry 3×, then contact everyone not opted out | ₹1,166.10 | 30.2% | 11,516 | ₹5,09,961 |
-| **agent** | uplift-ranked, budget-constrained, policy-gated | ₹1,159.50 | 29.7% | **1,800** | ₹1,15,990 |
+| **control** | nothing at all | ₹885.57 | 22.1% | 0 | ₹0 |
+| **naive** | retry 3×, then contact everyone not opted out | ₹1,150.34 | 29.7% | 11,880 | ₹5,25,540 |
+| **agent** | uplift-ranked, budget-constrained, policy-gated | ₹1,106.78 | 28.6% | **1,800** | ₹1,17,888 |
 
 | Comparison | Net / case | 95% CI | Significant |
 |---|---:|---|---|
-| agent vs control | **+₹244.85** | [+₹219.76, +₹271.36] | yes |
-| naive vs control | +₹251.45 | [+₹222.74, +₹280.89] | yes |
-| **agent vs naive** | **−₹6.60** | **[−₹31.16, +₹18.13]** | **no** |
+| agent vs control | **+₹221.21** | [+₹197.01, +₹246.80] | yes |
+| naive vs control | +₹264.77 | [+₹236.04, +₹294.04] | yes |
+| **agent vs naive** | **−₹43.57** | **[−₹68.60, −₹19.02]** | **yes** |
 
 ### Did the agent beat the naive baseline?
 
-**No. It tied it.** The interval on the difference crosses zero, so the two are
-statistically indistinguishable on net value per case. The randomised
-between-arms design agrees: −₹0.07, CI [−₹149.76, +₹147.33].
+**No — and the loss is statistically significant.** −₹43.57 per case, on an
+interval that excludes zero.
+
+An earlier version of this world produced a tie (−₹6.60, CI crossing zero). That
+world used invented gateway error codes and an assumed failure-class mix.
+Replacing both with Razorpay's documented error taxonomy and a mix calibrated
+against NPCI's published decline data moved the result **against** the agent,
+because business declines dominate technical ones by roughly ten to one and
+`insufficient_funds` is a class where blanket contacting genuinely pays. The
+calibration is documented in [`data/ASSUMPTIONS.md`](data/ASSUMPTIONS.md) (A2,
+A6); the result it produced is reported here rather than the one it replaced.
+
+The randomised between-arms design disagrees — +₹74.77, CI [−₹84.50, +₹243.84],
+not significant. The paired design is far more powerful (it differences away
+between-case variance, which dominates when amounts span ₹99 to ₹1,20,000), so
+it is the primary and the one quoted above. Both are in `summary.json`, and the
+disagreement is itself worth knowing: the loss is real but small against the
+noise a merchant would actually face.
 
 That is the honest answer and it is stated here, at the top, at the same size as
 the favourable one.
@@ -44,11 +59,11 @@ the favourable one.
 
 | Metric | Agent | Naive | Ratio |
 |---|---:|---:|---|
-| Customer contacts used | 1,800 | 11,516 | **6.4× fewer** |
-| Net incremental value per contact | **₹1,632.31** | ₹262.01 | **6.2×** |
+| Customer contacts used | 1,800 | 11,880 | **6.6× fewer** |
+| Net incremental value per contact | **₹1,474.73** | ₹267.45 | **5.5×** |
 
-The agent matches an unconstrained retry bot on money recovered while spending
-16% of its customer-contact budget.
+The agent comes within 3.8% of an unconstrained retry bot on money recovered
+while spending 15% of its customer-contact volume.
 
 ---
 
@@ -63,17 +78,17 @@ in the project and has no published value. So it is swept rather than defended.
 
 | ₹ / contact | control | naive | agent | naive contacts | agent contacts | agent − naive | winner |
 |---:|---:|---:|---:|---:|---:|---:|---|
-| ₹0 | ₹915 | ₹1,204 | ₹1,166 | 11,516 | 1,800 | −₹38.99 | naive |
-| ₹40 | ₹915 | ₹1,166 | ₹1,160 | 11,516 | 1,800 | −₹6.60 | naive |
-| **₹150** | ₹915 | ₹1,061 | **₹1,143** | 11,516 | 1,800 | **+₹82.46** | **agent** |
-| ₹400 | ₹915 | ₹821 | **₹1,115** | 11,516 | 1,800 | +₹294.75 | agent |
-| ₹900 | ₹915 | ₹341 | **₹1,063** | 11,516 | 1,800 | +₹721.74 | agent |
+| ₹0 | ₹886 | ₹1,190 | ₹1,113 | 11,880 | 1,800 | −₹77.17 | naive |
+| ₹40 | ₹886 | ₹1,150 | ₹1,107 | 11,880 | 1,800 | −₹43.57 | naive |
+| **₹150** | ₹886 | ₹1,041 | **₹1,090** | 11,880 | 1,800 | **+₹48.34** | **agent** |
+| ₹400 | ₹886 | ₹794 | **₹1,084** | 11,880 | 1,800 | +₹290.26 | agent |
+| ₹900 | ₹886 | ₹299 | **₹1,033** | 11,880 | 1,800 | +₹733.93 | agent |
 
 **The crossover sits between ₹40 and ₹150 per contact.** When a contact costs
 ₹40 against an average recoverable amount in the thousands, blanket maximalism
 is close to optimal — there is very little for targeting to save. As contact
-becomes expensive the naive arm loses 71.7% of its net value while the agent
-loses 8.8%, because it is carrying 6.4× less contact volume when the price rises.
+becomes expensive the naive arm loses 74.9% of its net value while the agent
+loses 7.2%, because it is carrying 6.6× less contact volume when the price rises.
 
 The annoyance cost was **not** tuned until the agent won. ₹40 was fixed before
 any arm was run and is the number the headline is reported at.
@@ -86,18 +101,58 @@ with one hand tied":
 
 | Budget / 1,000 | agent contacts | agent net | naive net | agent − naive | net per contact |
 |---:|---:|---:|---:|---:|---:|
-| 75 | 900 | ₹1,149.76 | ₹1,166.10 | −₹16.34 | ₹3,135 |
-| 150 | 1,800 | ₹1,159.50 | ₹1,166.10 | −₹6.60 | ₹1,632 |
-| 300 | 3,600 | ₹1,163.29 | ₹1,166.10 | −₹2.81 | ₹829 |
-| **600** | 7,200 | **₹1,231.98** | ₹1,166.10 | **+₹65.88** | ₹529 |
-| 1,200 | 10,396 | **₹1,299.65** | ₹1,166.10 | **+₹133.55** | ₹444 |
-| 3,000 | 10,396 | ₹1,299.65 | ₹1,166.10 | +₹133.55 | ₹444 |
+| 75 | 900 | ₹1,122.24 | ₹1,150.34 | −₹28.10 | ₹3,156 |
+| 150 | 1,800 | ₹1,106.78 | ₹1,150.34 | −₹43.57 | ₹1,475 |
+| 300 | 3,600 | ₹1,111.71 | ₹1,150.34 | −₹38.63 | ₹754 |
+| **600** | 7,200 | **₹1,167.32** | ₹1,150.34 | **+₹16.98** | ₹470 |
+| 1,200 | 11,573 | **₹1,246.67** | ₹1,150.34 | **+₹96.33** | ₹374 |
+| 3,000 | 11,573 | ₹1,246.67 | ₹1,150.34 | +₹96.33 | ₹374 |
 
-**At comparable contact spend the agent wins by ₹133.55 per case.** And it
-saturates: given an effectively unlimited budget it still sends only 10,396
-contacts, declining 1,120 that the naive bot sends because their marginal value
-does not clear the floor. The deficit at budget 150 is a constraint artifact,
-not a targeting failure.
+**At comparable contact spend the agent wins by ₹96.33 per case.** And it
+saturates: given an effectively unlimited budget it still sends only 11,573
+contacts, declining 307 that the naive bot sends because their marginal value
+does not clear the floor. The deficit at budget 150 is substantially a
+constraint artifact rather than a targeting failure — though on this calibrated
+world the agent needs roughly 4× its budget to overtake, where before it needed
+3×.
+
+### 3. Is the finding an artefact of the base rates?
+
+The two sweeps above move the **agent** inside a fixed world. A third moves the
+**world**: it perturbs the base natural-recovery rates and the treatment effects,
+regenerates the population and the historical log, refits the agent on that
+history, and re-runs all three arms. Batch size narrows the interval on a
+simulated delta; it does nothing about that delta sitting inside a world whose
+base rates were assumed. This is the only sweep that speaks to that.
+
+| A1 natural recovery, odds scale | mean p_nat | control | naive | agent | agent − naive | winner |
+|---:|---:|---:|---:|---:|---:|---|
+| 0.50 | 0.159 | ₹544 | ₹762 | ₹691 | −₹71.16 | naive |
+| 0.75 | 0.206 | ₹713 | ₹967 | ₹901 | −₹66.61 | naive |
+| 1.00 | 0.245 | ₹846 | ₹1,119 | ₹1,022 | −₹96.90 | naive |
+| 1.50 | 0.305 | ₹1,080 | ₹1,345 | ₹1,291 | −₹54.25 | naive |
+| 2.00 | 0.352 | ₹1,245 | ₹1,517 | ₹1,461 | −₹55.90 | naive |
+
+| A4 treatment strength | control | naive | agent | agent − naive | agent / contact | naive / contact | winner |
+|---:|---:|---:|---:|---:|---:|---:|---|
+| 0.00 (every action neutral) | ₹846 | ₹847 | ₹854 | +₹7.27 | ₹50 | ₹0 | agent |
+| 0.50 | ₹846 | ₹965 | ₹915 | −₹50.19 | ₹457 | ₹112 | naive |
+| 0.75 | ₹846 | ₹1,048 | ₹968 | −₹80.51 | ₹809 | ₹196 | naive |
+| 1.00 | ₹846 | ₹1,119 | ₹1,022 | −₹96.90 | ₹1,174 | ₹270 | naive |
+| 1.50 | ₹846 | ₹1,274 | ₹1,205 | −₹68.71 | ₹2,390 | ₹444 | naive |
+
+**The verdict is structural, not an artefact.** The agent loses to naive on net
+value in 9 of 10 perturbed worlds, across a 4× range of natural-recovery rates
+and the full range of treatment effectiveness. It wins only where interventions
+do nothing at all, and there it wins for the trivial reason that the naive arm's
+spending is pure waste.
+
+The efficiency finding is equally structural: the agent earns **4.1× to 5.4×**
+more per contact than the naive arm in every world where interventions have any
+effect. Neither result depends on the base rates being right.
+
+*(Run it with `python -m eval.assumption_sweep`; it is also folded into
+`python run.py eval` and lands in `summary.json`.)*
 
 ---
 
@@ -110,24 +165,26 @@ working system:
 **1. A single EV floor.** One ₹50 minimum applied to both retries and contacts.
 A retry costs ₹2; a contact carries ₹40 of annoyance on top of send cost.
 The single floor suppressed hundreds of profitable retries. Two floors ship:
-₹0.50 for zero-contact actions, ₹50 for contacts. 14,617 retries in the agent
+₹0.50 for zero-contact actions, ₹50 for contacts. 17,350 retries in the agent
 arm would have been suppressed by the single floor.
 
 **2. No sequential escalation.** The agent committed to one action type while
 the naive bot retried three times *and then* contacted. The agent was doing
 structurally less work, not smarter work. A standby contact candidate is now
 attached at allocation time and reconsidered once retries are spent — it fires
-on 682 cases.
+on 714 cases.
 
 **3. Quiet hours cancelling instead of deferring.** A 21:00–09:00 window covers
 half the clock. Blocking rather than deferring silently discards recoverable
 revenue for no compliance benefit. R6 now defers to the next permitted window;
-841 contacts were deferred and still sent.
+862 contacts were deferred and still sent.
 
-**4. Comparing gross recovery instead of net value.** This one is worth a number.
-Measured on **gross**, the naive arm leads by ₹39.43 per case. Measured on
-**net**, it leads by ₹6.60. Measuring the wrong thing would have overstated its
-lead sixfold — and gross charges nothing for the 11,516 contacts it sent.
+**4. Comparing gross recovery instead of net value.** Measured on **gross**, the
+naive arm leads by ₹77.54 per case. Measured on **net**, it leads by ₹43.57.
+Measuring the wrong thing overstates its advantage by 78%, because gross charges
+nothing for the 11,880 contacts it sent. On the earlier uncalibrated world this
+same error flipped the *sign* of the comparison; here it does not, and that is
+worth stating plainly rather than keeping the more dramatic claim.
 
 A fifth defect was caught by the generator's own property gate before anything
 was built on it: `human_escalation` was exempt from the hidden annoyance trait,
@@ -144,7 +201,7 @@ python run.py all
 
 Regenerates the world, verifies its difficulty gates, runs 140 tests, and
 reproduces **every number in this README and in the interface** from seed
-`8675309`. This run took 145.89s on Python 3.11.9. Artifacts are committed in
+`8675309`. This run took 275.83s on Python 3.11.9. Artifacts are committed in
 `eval/results/`.
 
 `make` works too if you have it (`make all`); `run.py` exists because this was
@@ -177,12 +234,16 @@ and a proven one matters more than either.
    customer's salary landed."
 
 4. **The LLM diagnosis path ran on its fallback throughout.** No
-   `ANTHROPIC_API_KEY` was present, so all 1,845 ambiguous cases were classified
-   by keyword heuristic at reduced confidence (0.55 on a match, 0.30 on none)
+   `ANTHROPIC_API_KEY` was present, so all 1,807 ambiguous cases were classified
+   by keyword heuristic at reduced confidence (0.63 on a match, 0.30 on none)
    rather than by a model. That is the designed degradation — the batch never
-   halted — and it is why overall diagnosis accuracy is 82.0% rather than
-   higher. It also means the calibration plot has only two points, because the
-   deterministic paths emit only two confidence values.
+   halted — and it is part of why overall diagnosis accuracy is 76.2% rather
+   than higher; the other part is that `repeated_failure` no longer has a
+   gateway code, by design. It also means the reliability plot has only two
+   populated buckets, because the deterministic paths emit a small set of fixed
+   confidence values. Both land close to the diagonal: 0.638 predicted against
+   0.624 observed, and 0.870 against 0.871 — which is what one would hope for,
+   since those constants were fitted on the training split.
 
 5. **The annoyance cost is an assumption, not a measurement**, and the headline
    is sensitive to it. The sweep above is the honest response.
@@ -248,31 +309,37 @@ a perfect match would itself be evidence of leakage.
 
 | | |
 |---|---|
-| Diagnosis accuracy | 82.0% overall, 87.1% when it commits, 5.9% abstention |
-| Diagnosis paths | 10,155 rules · 1,845 fallback (LLM unavailable) |
-| Uplift correlation | +0.470 predicted vs true, over 8,579 actioned cases |
-| Policy rule evaluations | 71,168 |
-| Candidate actions refused by policy | R7 6,262 · R2 4,974 · R3 2,220 · R1 1,578 |
-| Cases with every action refused | 2,185 |
-| Quiet-hour deferrals | 841 |
+| Diagnosis accuracy | 76.2% overall, 80.9% when it commits, 5.8% abstention |
+| Diagnosis paths | 10,193 rules · 1,115 keyword fallback · 692 abstained |
+| Uplift correlation | +0.538 predicted vs true, over 9,400 actioned cases |
+| Policy rule evaluations | 77,848 |
+| Candidate actions refused by policy | R7 6,478 · R2 4,338 · R3 2,072 · R1 1,512 |
+| Cases with every action refused | 2,090 |
+| Quiet-hour deferrals | 862 |
 | Unpermitted actions executed | **0** |
 | Tests | 140 passing (72 policy, 37 state machine, 22 allocation, 9 boundary) |
-| Revenue deliberately not pursued | 3,421 cases, ₹1,24,92,950 at risk |
-| …of which recovered anyway | 4.2% by revenue vs 20.3% control · 4.8% by case vs 22.6% control |
+| Revenue deliberately not pursued | 2,600 cases, ₹1,03,91,065 at risk |
+| …of which recovered anyway | 3.7% by revenue vs 19.5% control · 5.3% by case vs 22.1% control |
 
 That last row is the judgement claim: the cases the agent walked away from
-really were the ones that were not coming back, at roughly a quarter of the
-control-arm rate on either measure.
+really were the ones that were not coming back, at roughly a fifth of the
+control-arm rate by revenue and under a quarter by case.
 
-The single largest of them is worth opening in the interface. `REC-4482` is a
-₹1,00,833 payment, and the reason it was not pursued is:
+Diagnosis accuracy fell from 82.0% to 76.2% when the real taxonomy replaced the
+invented one. That is the world getting harder, not the agent getting worse:
+`repeated_failure` no longer has a gateway code of its own, because no real
+gateway emits one, so the class is now reachable only from customer history.
 
-> every action refused by policy (R7); forgoes method_update_request at
-> incremental EV 4180.06
+The single largest of them is worth opening in the interface. `REC-1074` is a
+₹1,09,688 payment, and the reason it was not pursued is:
 
-The case was 73.85 hours old against a 72-hour limit. The system had a
-positive-expected-value action available, priced it at ₹4,180, and declined to
-take it because a stopping rule said the recovery was no longer attributable.
+> every action refused by policy (R2); forgoes whatsapp_nudge at
+> incremental EV 10391.05
+
+The case carried a risk score above the 0.7 block threshold. The system had a
+positive-expected-value action available, priced it at ₹10,391 — the largest
+single forgone EV in the batch — and declined to take it because a policy rule
+said the case must not be actioned at all.
 That is what "the system can give up" looks like on real money.
 
 ---

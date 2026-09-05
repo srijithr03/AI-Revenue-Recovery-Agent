@@ -144,10 +144,17 @@ class ArmResult:
 
 class Harness:
     def __init__(self, annoyance_cost: float = DEFAULT_ANNOYANCE_COST,
-                 seed: int = 0, quiet: bool = False) -> None:
+                 seed: int = 0, quiet: bool = False,
+                 truth: dict[str, Any] | None = None) -> None:
         self.annoyance_cost = annoyance_cost
         self.seed = seed
         self.quiet = quiet
+        # Injectable ground truth. Normally None, so every executor loads
+        # data/ground_truth.json as usual. eval/assumption_sweep.py passes a
+        # PERTURBED world here to ask whether the headline conclusion survives
+        # base rates and treatment effects being wrong. Nothing else may use it,
+        # and it never reaches any agent layer -- only the L0 simulator.
+        self.truth = truth
         self.engine = PolicyEngine()
         # One trail PER ARM. Sharing a single trail keyed by case id meant that
         # in the paired design a case accumulated control, naive and agent
@@ -288,7 +295,7 @@ class Harness:
         self.log(f"  assignment: " +
                  "  ".join(f"{a} {len(by_arm[a])}" for a in ARMS))
 
-        executor = SimulatorExecutor(seed=self.seed)
+        executor = SimulatorExecutor(truth=self.truth, seed=self.seed)
         results = {
             "control": self.run_control(by_arm["control"], executor),
             "naive": self.run_naive(by_arm["naive"], diagnoses, executor),
@@ -321,11 +328,11 @@ class Harness:
         # does not leak between arms, but the latent draw per case is derived
         # from the case id and is therefore identical across all three.
         out = {
-            "control": self.run_control(cases, SimulatorExecutor(seed=self.seed)),
+            "control": self.run_control(cases, SimulatorExecutor(truth=self.truth, seed=self.seed)),
             "naive": self.run_naive(cases, diagnoses,
-                                    SimulatorExecutor(seed=self.seed)),
+                                    SimulatorExecutor(truth=self.truth, seed=self.seed)),
             "agent": self.run_agent(cases, diagnoses, model,
-                                    SimulatorExecutor(seed=self.seed)),
+                                    SimulatorExecutor(truth=self.truth, seed=self.seed)),
         }
         return {"results": out, "duration": time.perf_counter() - t0}
 

@@ -32,6 +32,8 @@ from agent.uplift import fit_from_history
 from eval.calibration import diagnosis_reliability, uplift_reliability
 from eval.harness import (CONTACT_BUDGET_PER_1000, Harness, compare,
                           compare_paired, recovery_by_class, value_band)
+from eval.assumption_sweep import (sweep_base_recovery,
+                                   sweep_treatment_strength)
 from eval.sensitivity import sweep_annoyance, sweep_budget
 from eval.stats import describe_delta
 
@@ -339,6 +341,59 @@ def main() -> int:
               f"{r['naive_net_per_case']:>11,.2f} {r['agent_vs_naive']:>+12,.2f} "
               f"{r['agent_net_per_contact'] or 0:>12,.0f}")
 
+    rule("SENSITIVITY -- assumption error (assumptions A1 and A4)")
+    print("The two sweeps above move the AGENT inside a fixed world.")
+    print("This one moves the WORLD: it perturbs the base natural-recovery")
+    print("rates and the treatment effects, regenerates the population and")
+    print("the historical log, REFITS the agent on that history, and re-runs")
+    print("all three arms.")
+    print("")
+    print("Batch size narrows the interval on a simulated delta. It does")
+    print("nothing about that delta sitting inside a world whose base rates")
+    print("were assumed. This is the only sweep that speaks to that, and it")
+    print("is the largest single threat to the headline number.")
+    print("")
+
+    arec = sweep_base_recovery(seed)
+    print("  A1  natural recovery, odds scale (1.00 = world as generated)")
+    print(f"  {'scale':>7} {'mean p_nat':>11} {'control':>10} {'naive':>10} "
+          f"{'agent':>10} {'agent-naive':>12} {'per contact':>12} {'winner':>8}")
+    for r in arec:
+        print(f"  {r['natural_recovery_odds_scale']:>7.2f} "
+              f"{r['mean_p_natural']:>11.4f} {r['control_net_per_case']:>10,.0f} "
+              f"{r['naive_net_per_case']:>10,.0f} {r['agent_net_per_case']:>10,.0f} "
+              f"{r['agent_vs_naive']:>+12,.2f} {r['agent_net_per_contact'] or 0:>12,.0f} "
+              f"{'agent' if r['agent_wins'] else 'naive':>8}")
+
+    atre = sweep_treatment_strength(seed)
+    print("")
+    print("  A4  treatment strength (0.00 = every action neutral)")
+    print(f"  {'scale':>7} {'control':>10} {'naive':>10} {'agent':>10} "
+          f"{'agent-naive':>12} {'agent/ct':>10} {'naive/ct':>10} {'winner':>8}")
+    for r in atre:
+        print(f"  {r['treatment_strength_scale']:>7.2f} "
+              f"{r['control_net_per_case']:>10,.0f} {r['naive_net_per_case']:>10,.0f} "
+              f"{r['agent_net_per_case']:>10,.0f} {r['agent_vs_naive']:>+12,.2f} "
+              f"{r['agent_net_per_contact'] or 0:>10,.0f} "
+              f"{r['naive_net_per_contact'] or 0:>10,.0f} "
+              f"{'agent' if r['agent_wins'] else 'naive':>8}")
+
+    _wins = sum(r["agent_wins"] for r in arec + atre)
+    print("")
+    print(f"  agent beats naive on net value in {_wins} of "
+          f"{len(arec) + len(atre)} perturbed worlds")
+    # The scale=0.0 world is excluded from the ratio range on purpose: with every
+    # action neutral the naive arm earns almost nothing per contact, so the ratio
+    # explodes to a meaningless number. The interesting claim is that the ratio
+    # stays large across worlds where interventions actually do something.
+    _ratios = [r["agent_net_per_contact"] / r["naive_net_per_contact"]
+               for r in atre
+               if r["naive_net_per_contact"] and r["treatment_strength_scale"] > 0]
+    if _ratios:
+        print(f"  efficiency ratio (agent/naive per contact) holds between "
+              f"{min(_ratios):.1f}x and {max(_ratios):.1f}x across worlds where "
+              f"interventions have any effect")
+
     # ---- policy ----------------------------------------------------------
     rule("POLICY")
     violations = 0
@@ -551,6 +606,8 @@ def main() -> int:
         "recovery_by_class": recovery_by_class(pres, truth),
         "sensitivity_annoyance": ann,
         "sensitivity_budget": bud,
+        "sensitivity_natural_recovery": arec,
+        "sensitivity_treatment_strength": atre,
         "funnel": funnel,
         "skipped": {
             "n": len(skipped),
