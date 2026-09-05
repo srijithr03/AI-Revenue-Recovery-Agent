@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { NavLink, Route, Routes } from 'react-router-dom';
+import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { fetchCases, fetchSummary } from './lib/api.js';
 import { ErrorState, Loading } from './components/common.jsx';
 import Explainer from './screens/Explainer.jsx';
@@ -40,6 +40,24 @@ export default function App() {
   }, []);
 
   const seed = summary?.run?.seed;
+
+  // The intro runs full-bleed with its own chrome. It is a different register
+  // from the console -- explanation rather than operation -- and the 240px rail
+  // would keep it framed as one more dashboard screen. Same app, same data
+  // loader, same artifacts; only the frame differs.
+  const fullBleed = useLocation().pathname === '/explainer';
+
+  if (fullBleed) {
+    return error ? (
+      <div className="page"><ErrorState error={error} /></div>
+    ) : !summary ? (
+      <div className="page"><Loading /></div>
+    ) : (
+      <Routes>
+        <Route path="/explainer" element={<Explainer summary={summary} />} />
+      </Routes>
+    );
+  }
 
   return (
     <div className="app">
