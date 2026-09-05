@@ -1,16 +1,79 @@
 # AI Revenue Recovery Agent
 
-Razorpay AI Buildathon 2026 · Track 03 · Revenue Recovery
+**Razorpay AI Buildathon 2026 · Track 03 — Revenue Recovery**
 
-**Not more retries. Fewer, better-targeted ones — and a number that survives
-scrutiny.**
+> **Not more retries. Fewer, better-targeted ones — and a number that survives scrutiny.**
 
-Failed-payment recovery treated as a *constrained allocation problem*. For each
-failed payment the agent estimates how much revenue an intervention would add
-**over doing nothing**, allocates a finite customer-contact budget to maximise
-that incremental value, executes only inside a deterministic policy layer,
-verifies outcomes, and proves the result against both a no-action control and a
-naive retry baseline.
+When a payment fails, some of that revenue comes back on its own, some comes back
+only if you act, and some never comes back at all. The hard part isn't retrying —
+it's that **"revenue recovered" is not directly observable**. You can see that a
+payment succeeded after you intervened; you cannot see whether it would have
+succeeded anyway. A retry bot reports the sum of both and calls it recovery.
+
+This agent treats failed-payment recovery as a **constrained allocation problem**.
+For each failed payment it estimates how much revenue an intervention would add
+*over doing nothing*, prices that against the cost of acting, allocates a finite
+customer-contact budget to the highest marginal value, executes only inside a
+deterministic policy layer, verifies outcomes, and proves the result against
+**two** baselines — a no-action control and a naive retry bot.
+
+### At a glance
+
+| | |
+|---|---|
+| **Evaluated on** | 12,000 held-out failed payments · seed `8675309` |
+| **vs no-action control** | **+₹219.81** per case · 95% CI [+₹195.94, +₹244.44] |
+| **vs naive retry bot** | **−₹65.56** per case — the agent loses, and this README leads with it |
+| **Contact efficiency** | **₹1,465** vs ₹296 net value per contact — **4.9×** better |
+| **Contacts spent** | 1,800 against the naive arm's 11,553 |
+| **Safety** | 140 tests passing · 70,864 policy rule evaluations · **0** violations |
+| **Reproducible** | `python run.py all` regenerates every number here in ~5 minutes |
+
+---
+
+## Quick start
+
+```bash
+pip install numpy pandas scipy scikit-learn pyyaml pydantic fastapi uvicorn anthropic razorpay pytest
+python run.py all
+```
+
+That generates the world, verifies its difficulty gates, runs the tests, and
+evaluates all three arms — about 5 minutes, no API keys needed.
+
+To view the interface, in two terminals:
+
+```bash
+python run.py serve
+```
+
+```bash
+cd ui && npm install && npm run dev
+```
+
+Open <http://localhost:5173> and **start at `/explainer`**.
+
+| Route | What it is |
+|---|---|
+| **`/explainer`** | **How it decides** — the uplift idea in six panels. Start here. |
+| `/` | Run overview — funnel, three arms, the case table |
+| `/case/:id` | One case end to end: alternatives, policy trace, audit log |
+| `/evaluation` | The evidence — sweeps, calibration, diagnostics, limitations |
+
+---
+
+## Contents
+
+| Section | What it answers |
+|---|---|
+| [Headline result](#headline-result) | What did it recover, and did it beat a retry bot? |
+| [How it works](#architecture) | Nine layers, and where the LLM is allowed to act |
+| [Why it did not win outright](#why-it-did-not-win-outright) | Three sweeps that explain the loss |
+| [What the third arm caught](#what-the-third-arm-caught) | Four bugs a two-arm design would have hidden |
+| [Is diagnosis accuracy worth improving?](#is-diagnosis-accuracy-worth-improving) | Measured before doing the work. No. |
+| [Reproducibility](#reproducibility) | One command, one seed, every number |
+| [Limitations](#limitations) | What this does not establish |
+| [Setup](#setup) | Configuration, environment variables, repo layout |
 
 ---
 
@@ -63,6 +126,56 @@ the favourable one.
 
 The agent comes within 5.4% of an unconstrained retry bot on money recovered
 while spending 16% of its customer-contact volume.
+
+---
+
+## Architecture
+
+Nine layers. Full detail in [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+```
+L0  SYNTHETIC WORLD      generator, hidden ground truth, historical log
+          ↓  observable features only — ground truth never passes down
+L1  DIAGNOSIS            rules for mapped codes; LLM for ambiguous free text
+L2  UPLIFT SCORING       P(recover | action) − P(recover | no action)
+L3  VALUATION            incremental EV; greedy allocation on MARGINAL gain
+L4  POLICY ENGINE        deterministic, total, 8 rules → ALLOW/ESCALATE/BLOCK
+L5  STATE MACHINE        enumerated transitions, bounded retries, escalation
+L6  VERIFICATION         attempted ≠ succeeded ≠ confirmed
+L7  AUDIT TRAIL          append-only, millisecond timestamps
+L8  EVALUATION           three arms, stratified, confidence intervals
+```
+
+### The LLM boundary
+
+**The LLM never touches money, limits, or state transitions.** It reads
+unstructured gateway text and proposes a failure class. That proposal is
+validated against a closed enumeration before it can affect anything — wrong
+class, out-of-range confidence, or malformed JSON is discarded and the
+deterministic fallback runs.
+
+It cannot compute a financial figure, approve an action, move a counter,
+trigger a transition, call a payment API, or override a policy rule. R8 rejects
+any action outside the permitted enumeration; `tests/test_policy.py` covers
+invented actions, case variants, and injection-shaped strings.
+
+### The ground-truth boundary
+
+The single mechanism preventing circular evaluation. Hidden ground truth
+(`p_natural`, `p_treated`, `true_failure_class`, `annoyance_prone`) lives in its
+own file that only the L0 simulator and the L8 scorer may open. The agent is
+fitted **only** on a historical exploration log of 25,000 past failed payments
+carrying a randomised action and an observed binary outcome — never a
+probability — and it keys everything on the *predicted* failure class, not the
+true one.
+
+`tests/test_ground_truth_boundary.py` asserts this three ways: statically (no
+decision module names a ground-truth field or imports the generator),
+structurally (separate files), and **behaviourally** — the agent produces
+byte-identical plans when `ground_truth.json` is replaced with garbage, which it
+could not do if it were reading it. A companion test asserts the agent's own
+`p_natural` estimate is correlated with but clearly *not equal to* the true one;
+a perfect match would itself be evidence of leakage.
 
 ---
 
@@ -338,56 +451,6 @@ and a proven one matters more than either.
 
 ---
 
-## Architecture
-
-Nine layers. Full detail in [`ARCHITECTURE.md`](ARCHITECTURE.md).
-
-```
-L0  SYNTHETIC WORLD      generator, hidden ground truth, historical log
-          ↓  observable features only — ground truth never passes down
-L1  DIAGNOSIS            rules for mapped codes; LLM for ambiguous free text
-L2  UPLIFT SCORING       P(recover | action) − P(recover | no action)
-L3  VALUATION            incremental EV; greedy allocation on MARGINAL gain
-L4  POLICY ENGINE        deterministic, total, 8 rules → ALLOW/ESCALATE/BLOCK
-L5  STATE MACHINE        enumerated transitions, bounded retries, escalation
-L6  VERIFICATION         attempted ≠ succeeded ≠ confirmed
-L7  AUDIT TRAIL          append-only, millisecond timestamps
-L8  EVALUATION           three arms, stratified, confidence intervals
-```
-
-### The LLM boundary
-
-**The LLM never touches money, limits, or state transitions.** It reads
-unstructured gateway text and proposes a failure class. That proposal is
-validated against a closed enumeration before it can affect anything — wrong
-class, out-of-range confidence, or malformed JSON is discarded and the
-deterministic fallback runs.
-
-It cannot compute a financial figure, approve an action, move a counter,
-trigger a transition, call a payment API, or override a policy rule. R8 rejects
-any action outside the permitted enumeration; `tests/test_policy.py` covers
-invented actions, case variants, and injection-shaped strings.
-
-### The ground-truth boundary
-
-The single mechanism preventing circular evaluation. Hidden ground truth
-(`p_natural`, `p_treated`, `true_failure_class`, `annoyance_prone`) lives in its
-own file that only the L0 simulator and the L8 scorer may open. The agent is
-fitted **only** on a historical exploration log of 25,000 past failed payments
-carrying a randomised action and an observed binary outcome — never a
-probability — and it keys everything on the *predicted* failure class, not the
-true one.
-
-`tests/test_ground_truth_boundary.py` asserts this three ways: statically (no
-decision module names a ground-truth field or imports the generator),
-structurally (separate files), and **behaviourally** — the agent produces
-byte-identical plans when `ground_truth.json` is replaced with garbage, which it
-could not do if it were reading it. A companion test asserts the agent's own
-`p_natural` estimate is correlated with but clearly *not equal to* the true one;
-a perfect match would itself be evidence of leakage.
-
----
-
 ## Selected results
 
 | | |
@@ -425,50 +488,45 @@ That is what "the system can give up" looks like on real money.
 
 ## Setup
 
-```bash
-pip install numpy pandas scipy scikit-learn pyyaml pydantic fastapi uvicorn anthropic razorpay pytest
-python run.py all          # data → verify → test → eval  (~3 min)
-```
+Quick start is [at the top](#quick-start). This section covers configuration.
 
-To view the interface:
+### Environment variables
 
-```bash
-python run.py serve
-```
-
-```bash
-cd ui && npm install && npm run dev
-```
-
-Then open <http://localhost:5173>. The API on `:8000` serves the artifacts;
-`audits.json` is 4.4MB and there is no reason to ship it to a browser so a judge
-can open one case.
-
-Four screens:
-
-| Route | What it is |
-|---|---|
-| `/explainer` | **How it decides** — the uplift idea in six panels, start here |
-| `/` | Run overview — funnel, three arms, the case table |
-| `/case/:id` | One case end to end: alternatives, policy trace, audit log |
-| `/evaluation` | The evidence — sweeps, calibration, diagnostics, limitations |
-
-`/explainer` exists because the headline reads as a loss to a retry bot unless
-you already have the uplift concept. It is deliberately thin: six panels, one
-button, no motion that isn't user-triggered. **Every figure on it is read from
-`summary.explainer`, which the harness writes** — nothing is hardcoded and
-nothing is computed in the browser, so `make eval` keeps the explanation true.
-The rejection case it shows is selected automatically as the narrowest miss in
-the batch, which is currently `REC-11462`: a contact worth ₹408.98 against ₹220.81
-for the retry actually taken, declined because the ₹188.17 it added on top fell
-₹0.04 under the cutoff.
-
-Optional environment variables — everything degrades gracefully without them:
+Everything degrades gracefully without them — the batch never halts, and the
+degradation is disclosed per case in the UI and in `summary.json`.
 
 | Variable | Effect if absent |
 |---|---|
-| `ANTHROPIC_API_KEY` | LLM diagnosis falls back to a keyword heuristic at reduced confidence |
-| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | test-mode adapter reports unavailable; the batch runs fully simulated |
+| `ANTHROPIC_API_KEY` | LLM diagnosis falls back to a keyword heuristic, then to customer history, at reduced and separately measured confidence |
+| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | The test-mode adapter reports itself unavailable and the batch runs fully simulated. The adapter refuses any key that is not `rzp_test_`. |
+
+**The run reported here had neither set.** Every figure was produced on the
+fallback paths, which is stated on the run overview as
+`12,000 simulated · 0 razorpay test`.
+
+### Commands
+
+| Command | What it does |
+|---|---|
+| `python run.py data` | Generate the world and history from the seed |
+| `python run.py verify` | Check the world clears its difficulty gates |
+| `python run.py test` | 140 tests: policy, state machine, allocation, boundary |
+| `python run.py eval` | Three-arm evaluation, sweeps, artifacts |
+| `python run.py all` | All of the above, in order |
+| `python run.py serve` | Read-only API over `eval/results/` on `:8000` |
+
+### Notes
+
+The API on `:8000` serves the artifacts to the UI. `audits.json` is 4.4 MB and
+is not shipped to the browser wholesale — the API serves one case at a time.
+
+The `/explainer` screen reads every figure from `summary.explainer`, which the
+harness writes. Nothing on it is hardcoded and nothing is computed in the
+browser, so `python run.py eval` keeps the explanation true. The rejection case
+it shows is chosen automatically as the narrowest budget miss in the batch —
+currently `REC-11462`, a contact worth ₹408.98 against ₹220.81 for the retry
+actually taken, declined because the ₹188.17 it added fell ₹0.04 under the
+cutoff.
 
 ### Layout
 
