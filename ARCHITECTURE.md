@@ -19,8 +19,8 @@ is designed but not implemented.
         ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ L1  DIAGNOSIS                                  agent/diagnosis.py       │
-│     mapped gateway code → lookup table        (10,155 of 12,000)        │
-│     unmapped free text   → LLM proposal       (1,845 of 12,000)         │
+│     mapped gateway code → lookup table        (10,242 of 12,000)        │
+│     unmapped free text   → LLM proposal       (1,758 of 12,000)         │
 │     ─── LLM BOUNDARY ─── every proposal validated against a closed enum │
 │     output: failure class · confidence · ≤3 signals · path              │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -204,7 +204,7 @@ both designs; both sensitivity sweeps; the API and all three UI screens.
 
 - The **live LLM path** (`LLMDiagnoser.diagnose_one`) makes real Anthropic API
   calls with a structured prompt, thread-pooled concurrency and an on-disk
-  cache. No `ANTHROPIC_API_KEY` was present, so all 1,845 ambiguous cases took
+  cache. No `ANTHROPIC_API_KEY` was present, so all 1,758 ambiguous cases took
   the keyword fallback. The *validation* logic that guards the boundary is
   exercised regardless, and is covered by tests.
 - The **Razorpay test-mode executor** creates real Orders and Payment Links and

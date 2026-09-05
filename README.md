@@ -1,33 +1,98 @@
+<div align="center">
+
 # AI Revenue Recovery Agent
 
-**Razorpay AI Buildathon 2026 · Track 03 — Revenue Recovery**
+**Razorpay AI Buildathon 2026 &nbsp;·&nbsp; Track 03 — Revenue Recovery**
 
-> **Not more retries. Fewer, better-targeted ones — and a number that survives scrutiny.**
+*Not more retries. Fewer, better-targeted ones — and a number that survives scrutiny.*
+
+<br>
+
+![Track 03 Revenue Recovery](https://img.shields.io/badge/Track-03%20Revenue%20Recovery-1A1A18?style=for-the-badge)
+![Tests 140 passing](https://img.shields.io/badge/Tests-140%20passing-0F6E56?style=for-the-badge&logo=pytest&logoColor=white)
+![Policy violations 0](https://img.shields.io/badge/Policy%20violations-0-0F6E56?style=for-the-badge&logo=shieldsdotio&logoColor=white)
+![Reproducible seed 8675309](https://img.shields.io/badge/Reproducible-seed%208675309-6B6A65?style=for-the-badge&logo=gnubash&logoColor=white)
+
+</div>
+
+---
+
+<div align="center">
+
+### Measured result
+
+![vs no-action control +₹219.81 per case](https://img.shields.io/badge/vs%20no--action%20control-%2B%E2%82%B9219.81%20per%20case-0F6E56?style=for-the-badge)
+![vs naive retry bot −₹65.56 per case](https://img.shields.io/badge/vs%20naive%20retry%20bot-%E2%88%92%E2%82%B965.56%20per%20case-854F0B?style=for-the-badge)
+![Value per contact 4.9× better](https://img.shields.io/badge/Value%20per%20contact-4.9%C3%97%20better-0F6E56?style=for-the-badge)
+![Held-out batch 12,000 payments](https://img.shields.io/badge/Held--out%20batch-12%2C000%20payments-6B6A65?style=for-the-badge)
+
+</div>
+
+> The amber badge is not a mistake. The agent **loses** to an unconstrained retry
+> bot on absolute net value, and this README says so in the same place and at the
+> same size as the figure it wins on. The evidence for both is
+> [below](#why-it-did-not-win-outright).
+
+---
+
+<div align="center">
+
+### Core stack
+
+![Python 3.11](https://img.shields.io/badge/Python-3.11-1A1A18?style=for-the-badge&logo=python&logoColor=white)
+![NumPy sampling](https://img.shields.io/badge/NumPy-sampling-6B6A65?style=for-the-badge&logo=numpy&logoColor=white)
+![pandas batch](https://img.shields.io/badge/pandas-batch-6B6A65?style=for-the-badge&logo=pandas&logoColor=white)
+![SciPy intervals](https://img.shields.io/badge/SciPy-intervals-6B6A65?style=for-the-badge&logo=scipy&logoColor=white)
+![scikit-learn uplift](https://img.shields.io/badge/scikit--learn-uplift-6B6A65?style=for-the-badge&logo=scikitlearn&logoColor=white)
+![pytest 140 tests](https://img.shields.io/badge/pytest-140%20tests-6B6A65?style=for-the-badge&logo=pytest&logoColor=white)
+
+### Interface
+
+![React 18](https://img.shields.io/badge/React-18-1A1A18?style=for-the-badge&logo=react&logoColor=white)
+![Vite build](https://img.shields.io/badge/Vite-build-6B6A65?style=for-the-badge&logo=vite&logoColor=white)
+![Recharts charts](https://img.shields.io/badge/Recharts-charts-6B6A65?style=for-the-badge&logo=chartdotjs&logoColor=white)
+![FastAPI read-only API](https://img.shields.io/badge/FastAPI-read--only%20API-6B6A65?style=for-the-badge&logo=fastapi&logoColor=white)
+
+### Integrations
+
+![Anthropic Claude — ambiguous diagnosis](https://img.shields.io/badge/Anthropic-Claude%20%E2%80%94%20ambiguous%20diagnosis-1A1A18?style=for-the-badge&logo=anthropic&logoColor=white)
+![Razorpay test-mode adapter](https://img.shields.io/badge/Razorpay-test--mode%20adapter-6B6A65?style=for-the-badge&logo=razorpay&logoColor=white)
+![YAML policy config](https://img.shields.io/badge/YAML-policy%20config-6B6A65?style=for-the-badge&logo=yaml&logoColor=white)
+
+</div>
+
+---
+
+## The problem
 
 When a payment fails, some of that revenue comes back on its own, some comes back
-only if you act, and some never comes back at all. The hard part isn't retrying —
-it's that **"revenue recovered" is not directly observable**. You can see that a
-payment succeeded after you intervened; you cannot see whether it would have
-succeeded anyway. A retry bot reports the sum of both and calls it recovery.
+only if you act, and some never comes back at all.
 
-This agent treats failed-payment recovery as a **constrained allocation problem**.
-For each failed payment it estimates how much revenue an intervention would add
-*over doing nothing*, prices that against the cost of acting, allocates a finite
-customer-contact budget to the highest marginal value, executes only inside a
-deterministic policy layer, verifies outcomes, and proves the result against
-**two** baselines — a no-action control and a naive retry bot.
+The hard part isn't retrying — it's that **"revenue recovered" is not directly
+observable.** You can see that a payment succeeded after you intervened. You
+cannot see whether it would have succeeded anyway. A retry bot reports the sum of
+both and calls it recovery.
 
-### At a glance
+In this batch a control arm that takes **no action at all** still recovers 23.1%
+of cases and ₹922 per case. Any system that does not measure against that number
+is reporting revenue it did not cause.
 
-| | |
-|---|---|
-| **Evaluated on** | 12,000 held-out failed payments · seed `8675309` |
-| **vs no-action control** | **+₹219.81** per case · 95% CI [+₹195.94, +₹244.44] |
-| **vs naive retry bot** | **−₹65.56** per case — the agent loses, and this README leads with it |
-| **Contact efficiency** | **₹1,465** vs ₹296 net value per contact — **4.9×** better |
-| **Contacts spent** | 1,800 against the naive arm's 11,553 |
-| **Safety** | 140 tests passing · 70,864 policy rule evaluations · **0** violations |
-| **Reproducible** | `python run.py all` regenerates every number here in ~5 minutes |
+## What this does
+
+Failed-payment recovery treated as a **constrained allocation problem**. For each
+failed payment the agent:
+
+| | Step | |
+|---|---|---|
+| **1** | **Diagnoses** the failure | Mapped gateway codes by lookup; ambiguous free text by LLM, which may abstain |
+| **2** | **Estimates uplift** | Not *"will this recover?"* but *"will this recover **because of me**?"* |
+| **3** | **Prices the action** | `amount × uplift − cost`, where contacting a customer costs far more than the message |
+| **4** | **Allocates a budget** | Finite contacts, ranked by **marginal** gain over the free action already assigned |
+| **5** | **Checks policy** | Eight deterministic rules, evaluated on every candidate, recorded even when they pass |
+| **6** | **Executes and verifies** | Attempted ≠ succeeded ≠ confirmed, tracked as three separate quantities |
+
+Then it proves the result against **two** baselines — a no-action control that
+measures natural recovery, and a naive retry bot.
 
 ---
 
@@ -38,8 +103,8 @@ pip install numpy pandas scipy scikit-learn pyyaml pydantic fastapi uvicorn anth
 python run.py all
 ```
 
-That generates the world, verifies its difficulty gates, runs the tests, and
-evaluates all three arms — about 5 minutes, no API keys needed.
+Generates the world, verifies its difficulty gates, runs 140 tests, and evaluates
+all three arms. About five minutes. **No API keys required.**
 
 To view the interface, in two terminals:
 
@@ -51,7 +116,7 @@ python run.py serve
 cd ui && npm install && npm run dev
 ```
 
-Open <http://localhost:5173> and **start at `/explainer`**.
+Open <http://localhost:5173> and start at **`/explainer`**.
 
 | Route | What it is |
 |---|---|
@@ -67,7 +132,7 @@ Open <http://localhost:5173> and **start at `/explainer`**.
 | Section | What it answers |
 |---|---|
 | [Headline result](#headline-result) | What did it recover, and did it beat a retry bot? |
-| [How it works](#architecture) | Nine layers, and where the LLM is allowed to act |
+| [Architecture](#architecture) | Nine layers, and where the LLM is allowed to act |
 | [Why it did not win outright](#why-it-did-not-win-outright) | Three sweeps that explain the loss |
 | [What the third arm caught](#what-the-third-arm-caught) | Four bugs a two-arm design would have hidden |
 | [Is diagnosis accuracy worth improving?](#is-diagnosis-accuracy-worth-improving) | Measured before doing the work. No. |
